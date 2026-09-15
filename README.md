@@ -5,7 +5,45 @@
 
 ## セットアップ
 
-Node.js 18.18 以上が必要（このマシンには未インストール）。
+Docker を使う方法と、ローカルに Node.js を入れる方法のどちらでもよい。
+チームで環境を揃えたいなら Docker を推奨。
+
+### Docker（推奨）
+
+Docker Desktop が動いていればよい。Node のバージョン差やネイティブ依存の
+インストール失敗を気にする必要がない。
+
+```bash
+cp .env.example .env.local
+```
+
+`.env.local` に Anthropic の API キーを入れる（無くても起動する。下記参照）。
+
+```bash
+docker compose up
+```
+
+http://localhost:3000
+
+ソースはホストとコンテナ間でマウントされているので、ファイルを編集すれば
+そのままホットリロードされる。`node_modules` はコンテナ専用の Docker ボリュームに
+分離してあるので、ホスト側で `npm install` する必要はない。
+
+依存関係を追加・変更したとき（`package.json` を書き換えたとき）は再ビルドする。
+
+```bash
+docker compose up --build
+```
+
+止めるとき:
+
+```bash
+docker compose down
+```
+
+### ローカルに Node.js を入れる方法
+
+Node.js 18.18 以上が必要。
 
 ```bash
 npm install

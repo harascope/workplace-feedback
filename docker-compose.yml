@@ -1,0 +1,26 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      # ソースをホストと同期してホットリロードを効かせる
+      - .:/app
+      # コンテナ内の node_modules をホストのものと分離する
+      # （OS が違うとネイティブ依存が壊れるため）
+      - node_modules:/app/node_modules
+      - next_cache:/app/.next
+    environment:
+      - NODE_ENV=development
+      # 各自の .env.local から ANTHROPIC_API_KEY を引き継ぐ。
+      # 未設定でもキーワード判定のスタブで起動する。
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    # -H 0.0.0.0 が無いと 127.0.0.1 にしかバインドされず、
+    # ホストから localhost:3000 でアクセスできなくなる
+    command: npx next dev -H 0.0.0.0
+
+volumes:
+  node_modules:
+  next_cache:

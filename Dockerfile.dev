@@ -1,0 +1,17 @@
+# 開発用。ホットリロードでソースをマウントして使う（docker-compose.yml 参照）。
+# 本番デプロイ用ではない。
+FROM node:24-slim
+
+WORKDIR /app
+
+# 依存関係だけ先にコピーしてキャッシュを効かせる
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# ソースは docker-compose のボリュームマウントで上書きされる想定だが、
+# マウント無しで docker build 単体でも動くように一応コピーしておく
+COPY . .
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]
