@@ -8,3 +8,7 @@ next-env.d.ts
 .claude/launch.json
 tsconfig.tsbuildinfo
 .playwright-mcp/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

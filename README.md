@@ -43,7 +43,7 @@ docker compose down
 
 ### ローカルに Node.js を入れる方法
 
-Node.js 20.9 以上が必要。
+Node.js 22.13 以上が必要（テストに使う Vitest 5 の要件）。
 
 ```bash
 npm install
@@ -123,3 +123,31 @@ UI の分岐（欠落の促し・特定リスク・レベル3停止・権力差�
 このままひととおり確認できるが、文面の質は実 API とは別物。
 
 キーを `.env.local` に設定すれば実 API に切り替わり、スタブは呼ばれない。
+
+## テスト
+
+### ユニット・コンポーネント（Vitest）
+
+```bash
+npm test
+```
+
+### E2E（Playwright）
+
+初回だけブラウザを入れる。
+
+```bash
+npx playwright install chromium
+```
+
+```bash
+npm run test:e2e
+```
+
+本番ビルドを 3200 番ポートで起動し、スタブで動かす。サーバーのメモリ上のデータを
+全テストで共有するので、並列にせず直列で実行する。
+
+### CI
+
+GitHub Actions で push と pull request のたびに、型チェック・ユニット・E2E を実行する。
+API キーは使わない（スタブで動く）。
