@@ -43,7 +43,7 @@ docker compose down
 
 ### ローカルに Node.js を入れる方法
 
-Node.js 18.18 以上が必要。
+Node.js 20.9 以上が必要。
 
 ```bash
 npm install
