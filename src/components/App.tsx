@@ -20,6 +20,16 @@ type Mode = "user" | "admin";
 
 type Tab = "write" | "inbox";
 
+function Mark({ small = false }: { small?: boolean }) {
+  return (
+    <span className={`brand-mark ${small ? "brand-mark--small" : ""}`} aria-hidden>
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M7 7.5h10M7 11.5h6.5M9.25 18l-4 2v-4.3A7 7 0 0 1 3 10.55C3 6.93 6.36 4 10.5 4h3C17.64 4 21 6.93 21 10.55s-3.36 6.55-7.5 6.55h-1.8" />
+      </svg>
+    </span>
+  );
+}
+
 export default function App() {
   // 認証は実装しない。人物セレクタで代用する。
   const [mode, setMode] = useState<Mode | null>(null);
@@ -53,76 +63,48 @@ export default function App() {
 
   if (!mode) {
     return (
-      <div className="shell">
-        <div className="wrap" style={{ paddingBlock: "5rem 3rem" }}>
-          <h1 className="title">言いにくいことを、届ける</h1>
-          <p className="eyebrow" style={{ marginTop: "0.4rem" }}>
-            社内フィードバック（デモ）
-          </p>
+      <div className="shell demo-shell">
+        <main className="demo-gate">
+          <header className="demo-header">
+            <div>
+              <p className="demo-system-label">WORKPLACE FEEDBACK</p>
+              <h1>デモ用選択画面</h1>
+            </div>
+            <span className="demo-version">v0.1 / DEMO</span>
+          </header>
 
-          <p className="lede" style={{ marginTop: "2.5rem", maxWidth: "34rem" }}>
-            職場で気になったことを、相手に匿名で伝えるためのツールです。
-            誰が書いたかは、相手にも人事にも表示されません。
-          </p>
+          <div className="demo-rule" />
 
-          <div style={{ marginTop: "2.5rem", display: "grid", gap: "0.75rem" }}>
-            <button onClick={() => setMode("user")} className="card-choice">
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "1rem",
-                }}
-              >
-                <span style={{ display: "flex", alignItems: "center", gap: "0.9rem" }}>
-                  <span className="chip" aria-hidden>
-                    利用
-                  </span>
-                  <span>
-                    <span style={{ fontSize: "0.98rem", fontWeight: 700 }}>利用者として使う</span>
-                    <span className="lede" style={{ display: "block", fontSize: "0.83rem" }}>
-                      書くことも、届いたものを読むことも、同じ画面でできます
-                    </span>
-                  </span>
-                </span>
-                <span aria-hidden style={{ color: "var(--brand)", fontSize: "1.1rem", lineHeight: 1 }}>
-                  →
-                </span>
+          <section className="demo-selector" aria-label="表示モードを選択">
+            <div className="demo-selector-head">
+              <span>SELECT VIEW</span>
+              <span>認証は実装されていません</span>
+            </div>
+
+            <button onClick={() => setMode("user")} className="demo-option">
+              <span className="demo-option-index">01</span>
+              <span className="demo-option-copy">
+                <strong>利用者画面</strong>
+                <small>フィードバックの作成・受信</small>
               </span>
+              <span className="demo-option-arrow" aria-hidden>↗</span>
             </button>
 
-            <button onClick={() => setMode("admin")} className="card-choice">
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "1rem",
-                }}
-              >
-                <span style={{ display: "flex", alignItems: "center", gap: "0.9rem" }}>
-                  <span className="chip" aria-hidden>
-                    管理
-                  </span>
-                  <span>
-                    <span style={{ fontSize: "0.98rem", fontWeight: 700 }}>管理者として見る</span>
-                    <span className="lede" style={{ display: "block", fontSize: "0.83rem" }}>
-                      配信状況と、部署ごとの状態を見る
-                    </span>
-                  </span>
-                </span>
-                <span aria-hidden style={{ color: "var(--brand)", fontSize: "1.1rem", lineHeight: 1 }}>
-                  →
-                </span>
+            <button onClick={() => setMode("admin")} className="demo-option">
+              <span className="demo-option-index">02</span>
+              <span className="demo-option-copy">
+                <strong>管理者画面</strong>
+                <small>配信状況・部署別ステータス</small>
               </span>
+              <span className="demo-option-arrow" aria-hidden>↗</span>
             </button>
-          </div>
+          </section>
 
-          <p className="fineprint" style={{ marginTop: "2.5rem" }}>
-            デモのため認証はありません。本番では社内アカウントで認証し、利用者はこの選択なしに自分の画面へ入ります。
-          </p>
-        </div>
+          <footer className="demo-meta">
+            <span>LOCAL PROTOTYPE</span>
+            <span>NO AUTHENTICATION</span>
+          </footer>
+        </main>
       </div>
     );
   }
@@ -130,31 +112,22 @@ export default function App() {
   return (
     <div className="shell">
       <header className="topbar">
-        <div
-          className="wrap"
-          style={{
-            paddingBlock: "1.15rem",
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "0.9rem",
-          }}
-        >
-          <div>
-            <h1 className="title" style={{ fontSize: "1.05rem" }}>
-              言いにくいことを、届ける
-            </h1>
-            <p className="eyebrow">
+        <div className="app-header wrap-wide">
+          <div className="brand-lockup brand-lockup--header">
+            <Mark small />
+            <span>Relay</span>
+          </div>
+          <div className="header-context">
+            <span className="header-context-dot" />
+            <p>
               {mode === "admin" ? "管理者として表示しています" : `${me.name} として表示しています`}
             </p>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+          <div className="header-actions">
             {mode === "user" && (
               <select
-                className="field"
-                style={{ width: "auto" }}
+                className="field user-select"
                 aria-label="表示する人物"
                 value={meId}
                 onChange={(e) => setMeId(e.target.value)}
@@ -166,8 +139,8 @@ export default function App() {
                 ))}
               </select>
             )}
-            <button className="link-quiet" onClick={() => setMode(null)}>
-              {mode === "admin" ? "利用者に戻る" : "管理者画面へ"}
+            <button className="mode-switch" onClick={() => setMode(null)}>
+              {mode === "admin" ? "利用者に戻る" : "管理者画面"}
             </button>
           </div>
         </div>
@@ -175,7 +148,7 @@ export default function App() {
 
       {mode === "user" && (
         <nav className="tabbar">
-          <div className="wrap" style={{ display: "flex", gap: "0.25rem" }}>
+          <div className="wrap app-tabs">
             <button
               className={`tab ${tab === "write" ? "tab--on" : ""}`}
               onClick={() => setTab("write")}
@@ -196,7 +169,7 @@ export default function App() {
         </nav>
       )}
 
-      <main className="wrap" style={{ paddingBlock: "2.25rem 1rem", flex: 1 }}>
+      <main className="wrap app-main">
         {stub && (
           <div className="notice notice--warn" style={{ marginBottom: "1.75rem" }}>
             <div className="fineprint" style={{ color: "var(--warn)" }}>
@@ -215,7 +188,7 @@ export default function App() {
         {mode === "admin" && <Admin key={`a${nonce}`} onChanged={bump} />}
       </main>
 
-      <footer className="wrap" style={{ paddingBlock: "1.5rem 2.5rem" }}>
+      <footer className="wrap app-footer">
         <hr className="rule" style={{ marginBottom: "1.1rem" }} />
         <button className="link-quiet" onClick={reset}>
           デモを初期状態に戻す
