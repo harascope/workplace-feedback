@@ -1,0 +1,431 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --------------------------------------------------------------------------
+   デザイントークン
+
+   深い青緑を主色に置き、面には陰影と上端のハイライトを与えて立体感を出す。
+   ただし警告（warn）と停止（stop）だけは装飾を足さない。
+   重い内容が軽く見えると、読む前に受け取り方が変わってしまうため。
+   -------------------------------------------------------------------------- */
+:root {
+  /* 地と面 */
+  --paper: #eef0ee;
+  --paper-2: #e4e8e6;
+  --surface: #ffffff;
+  --surface-sunken: #f1f4f3;
+  --surface-tint: #f4f8f7;
+
+  /* 文字 */
+  --ink: #16202a;
+  --sub: #4c5866;
+  --faint: #7c8895;
+  --on-brand: #eaf3f1;
+  --on-brand-faint: #a9c7c2;
+
+  /* 主色（深い青緑） */
+  --brand: #14615c;
+  --brand-deep: #0d4642;
+  --brand-dark: #093330;
+  --brand-lift: #1d7a73;
+  --brand-pale: #dcebe8;
+  --brand-line: #b9d5d0;
+
+  /* 副色（数値・状態の強調に使う銅色） */
+  --copper: #a8602c;
+  --copper-pale: #f6ece3;
+
+  --line: #dfe4e2;
+  --line-strong: #c6cfcc;
+
+  /* 警告・停止。ここは彩度も影も足さない */
+  --warn: #8a6316;
+  --warn-bg: #fdf8ec;
+  --warn-line: #e6d3a6;
+
+  --stop: #8c2f2f;
+  --stop-bg: #fcf3f2;
+  --stop-line: #e5c3bf;
+
+  --radius: 14px;
+  --radius-sm: 9px;
+
+  /* 高さの段階。影は必ず「接地の濃い影」＋「広く薄い影」の二枚重ね */
+  --e1:
+    0 1px 1px rgba(13, 32, 42, 0.05),
+    0 2px 6px -2px rgba(13, 32, 42, 0.08);
+  --e2:
+    0 1px 2px rgba(13, 32, 42, 0.06),
+    0 6px 16px -6px rgba(13, 32, 42, 0.16);
+  --e3:
+    0 2px 4px rgba(13, 32, 42, 0.08),
+    0 18px 36px -14px rgba(13, 32, 42, 0.28);
+  /* 面の上端に入れる光。これがあると板が浮いて見える */
+  --sheen: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  color-scheme: light;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background:
+      radial-gradient(1200px 520px at 50% -10%, #ffffff 0%, rgba(255, 255, 255, 0) 60%),
+      linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family:
+      "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo,
+      system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* 日本語は行間を広めに取らないと、長い説明文が読みにくい */
+    line-height: 1.9;
+    font-size: 15px;
+    /* 約物のアキを詰める */
+    font-feature-settings: "palt" 1;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* キーボード操作時だけフォーカスリングを出す */
+  :focus-visible {
+    outline: 2px solid var(--brand-lift);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  select,
+  textarea,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+/* 以下は @layer components に入れない。Tailwind がクラス名を動的生成（btn--${variant} 等）
+   のため未使用とみなして削ってしまうため、通常の CSS として書く。 */
+
+/* 画面の外枠 -------------------------------------------------------------- */
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding-inline: 20px;
+}
+
+/* 上部の帯。主色を面で使い、下に影を落として本文より手前に置く */
+.topbar {
+  background:
+    linear-gradient(180deg, var(--brand) 0%, var(--brand-deep) 100%);
+  color: var(--on-brand);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 10px 24px -14px rgba(9, 51, 48, 0.75);
+  position: relative;
+  z-index: 2;
+}
+
+.topbar .title {
+  color: #ffffff;
+}
+
+.topbar .eyebrow {
+  color: var(--on-brand-faint);
+}
+
+/* 見出し ------------------------------------------------------------------ */
+.title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  color: var(--faint);
+  letter-spacing: 0.08em;
+  line-height: 1.6;
+}
+
+/* カード内の項目名。主色を薄く入れて本文と役割を分ける */
+.label {
+  font-size: 0.7rem;
+  color: var(--brand);
+  opacity: 0.75;
+  letter-spacing: 0.09em;
+  font-weight: 600;
+  line-height: 1.6;
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.body-text {
+  font-size: 0.94rem;
+  line-height: 1.95;
+  color: var(--ink);
+}
+
+.lede {
+  font-size: 0.9rem;
+  line-height: 1.95;
+  color: var(--sub);
+}
+
+.fineprint {
+  font-size: 0.76rem;
+  line-height: 1.85;
+  color: var(--faint);
+}
+
+/* 面 ---------------------------------------------------------------------- */
+.card {
+  background: linear-gradient(180deg, #ffffff 0%, #fcfdfd 100%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--e2), var(--sheen);
+  padding: 1.375rem 1.5rem;
+}
+
+/* 主役のカード。一段高く置く */
+.card--raised {
+  box-shadow: var(--e3), var(--sheen);
+  border-color: var(--brand-line);
+}
+
+/* 入口のロール選択 */
+.card-choice {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: linear-gradient(180deg, #ffffff 0%, #fafcfb 100%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--e2), var(--sheen);
+  padding: 1.125rem 1.25rem;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.card-choice:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--e3), var(--sheen);
+  border-color: var(--brand-line);
+}
+
+.card-choice:active {
+  transform: translateY(0);
+  box-shadow: var(--e1), var(--sheen);
+}
+
+/* ロール選択の丸い印。主色のグラデで凸に見せる */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: none;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--brand-lift) 0%, var(--brand-deep) 100%);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 3px 8px -2px rgba(9, 51, 48, 0.45);
+}
+
+/* 知らせ ------------------------------------------------------------------ */
+/* 全面を塗らず、左の罫だけで種別を示す。塗ると警告が強すぎる */
+.notice {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--brand-line);
+  border-left: 3px solid var(--brand);
+  background: linear-gradient(180deg, var(--surface-tint) 0%, #ffffff 100%);
+  box-shadow: var(--e1), var(--sheen);
+  padding: 1rem 1.2rem;
+}
+
+.notice-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.7;
+  margin-bottom: 0.3rem;
+  color: var(--brand-deep);
+}
+
+/* 警告と停止は平らに置く。影も光沢も付けない */
+.notice--warn {
+  background: var(--warn-bg);
+  border-color: var(--warn-line);
+  border-left-color: var(--warn);
+  box-shadow: none;
+}
+.notice--warn .notice-title {
+  color: var(--warn);
+}
+
+.notice--stop {
+  background: var(--stop-bg);
+  border-color: var(--stop-line);
+  border-left-color: var(--stop);
+  box-shadow: none;
+}
+.notice--stop .notice-title {
+  color: var(--stop);
+}
+
+/* 操作 -------------------------------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.15rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.5;
+  border: 1px solid transparent;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
+}
+
+.btn:not(:disabled):active {
+  transform: translateY(1px);
+  box-shadow: var(--e1);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn--solid {
+  background: linear-gradient(180deg, #2c3a47 0%, var(--ink) 100%);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    var(--e2);
+}
+.btn--solid:not(:disabled):hover {
+  filter: brightness(1.14);
+}
+
+.btn--accent {
+  background: linear-gradient(180deg, var(--brand-lift) 0%, var(--brand-deep) 100%);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 4px 12px -4px rgba(9, 51, 48, 0.5),
+    var(--e1);
+}
+.btn--accent:not(:disabled):hover {
+  filter: brightness(1.1);
+}
+
+.btn--ghost {
+  background: linear-gradient(180deg, #ffffff 0%, #f3f6f5 100%);
+  color: var(--ink);
+  border-color: var(--line-strong);
+  box-shadow: var(--e1), var(--sheen);
+}
+.btn--ghost:not(:disabled):hover {
+  border-color: var(--brand-line);
+  color: var(--brand-deep);
+}
+
+.link-quiet {
+  font-size: 0.78rem;
+  color: var(--faint);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+.link-quiet:hover {
+  color: var(--brand);
+}
+
+/* 帯の上に置くリンクは、地が濃いので色を変える */
+.topbar .link-quiet {
+  color: var(--on-brand-faint);
+}
+.topbar .link-quiet:hover {
+  color: #fff;
+}
+
+/* 入力 -------------------------------------------------------------------- */
+.field {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.8rem;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  /* 入力欄はへこませる。押す面（ボタン）と逆にする */
+  box-shadow: inset 0 2px 4px rgba(13, 32, 42, 0.06);
+  transition: border-color 0.15s ease;
+}
+
+.field:hover {
+  border-color: var(--brand-line);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 11rem;
+  background: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 1.05rem 1.2rem;
+  font-size: 0.94rem;
+  line-height: 1.95;
+  resize: vertical;
+  box-shadow: inset 0 2px 5px rgba(13, 32, 42, 0.07);
+  transition: border-color 0.15s ease;
+}
+
+.textarea:hover,
+.textarea:focus {
+  border-color: var(--brand-line);
+}
+
+.textarea::placeholder {
+  color: var(--faint);
+}
+
+/* 数値の強調 -------------------------------------------------------------- */
+.stat {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--brand-deep);
+  font-feature-settings: "tnum" 1;
+}
+
+.stat--zero {
+  color: var(--faint);
+}
+
+/* 区切り ------------------------------------------------------------------ */
+.rule {
+  border: 0;
+  border-top: 1px solid var(--line);
+}
