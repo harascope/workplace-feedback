@@ -429,3 +429,53 @@
   border: 0;
   border-top: 1px solid var(--line);
 }
+
+/* タブ ------------------------------------------------------------------- */
+/* 「書く」と「届いたもの」を同じ画面に置く。入口で立場を選ばせない（仕様書 0.4）。 */
+.tabbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(13, 32, 42, 0.04);
+  position: relative;
+  z-index: 1;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.85rem 1.1rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--faint);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.tab:hover {
+  color: var(--sub);
+}
+
+.tab--on {
+  color: var(--brand-deep);
+  border-bottom-color: var(--brand);
+}
+
+/* 自分の受信件数。自分にしか見えないので件数を出してよい */
+.tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+}

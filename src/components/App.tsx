@@ -1,26 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { resetAction, stubModeAction } from "@/app/actions";
+import { useCallback, useEffect, useState } from "react";
+import { inboxAction, resetAction, stubModeAction } from "@/app/actions";
 import { USERS, userById } from "@/lib/data/users";
 import Admin from "./Admin";
 import Compose from "./Compose";
 import Inbox from "./Inbox";
 
-type Role = "sender" | "recipient" | "admin";
+/**
+ * 入口は「利用者」と「管理者」の2つだけ。
+ *
+ * 送信者／受信者を分けない理由（仕様書 0.4）:
+ * 入口で立場を選ばせると、開くこと自体が意思表示になる。
+ * 「私はこれから告発します」という構えを要求することになり、
+ * 小規模組織では利用の事実そのものが推測材料になる。
+ * 全員が同じ画面を使い、書くことも受け取ることも同じ場所で行う。
+ */
+type Mode = "user" | "admin";
 
-const ROLES: { key: Role; label: string; note: string; mark: string }[] = [
-  { key: "sender", label: "送信者", note: "気になったことを書いて、相手に届ける", mark: "送" },
-  { key: "recipient", label: "受信者", note: "自分に届いたフィードバックを読む", mark: "受" },
-  { key: "admin", label: "管理者", note: "配信状況と、部署ごとの状態を見る", mark: "管" },
-];
+type Tab = "write" | "inbox";
 
 export default function App() {
-  // 認証は実装しない。ロール選択と人物セレクタで代用する。
-  const [role, setRole] = useState<Role | null>(null);
+  // 認証は実装しない。人物セレクタで代用する。
+  const [mode, setMode] = useState<Mode | null>(null);
+  const [tab, setTab] = useState<Tab>("write");
   const [meId, setMeId] = useState("u3");
   const [nonce, setNonce] = useState(0);
   const [stub, setStub] = useState(false);
+  const [inboxCount, setInboxCount] = useState(0);
 
   const me = userById(meId)!;
 
@@ -28,12 +35,23 @@ export default function App() {
     void stubModeAction().then(setStub);
   }, []);
 
+  const refreshInbox = useCallback(async () => {
+    const r = await inboxAction(meId);
+    if (r.ok) setInboxCount(r.data.length);
+  }, [meId]);
+
+  useEffect(() => {
+    if (mode === "user") void refreshInbox();
+  }, [mode, refreshInbox, nonce]);
+
   const reset = async () => {
     await resetAction();
     setNonce((n) => n + 1);
   };
 
-  if (!role) {
+  const bump = () => setNonce((n) => n + 1);
+
+  if (!mode) {
     return (
       <div className="shell">
         <div className="wrap" style={{ paddingBlock: "5rem 3rem" }}>
@@ -48,37 +66,61 @@ export default function App() {
           </p>
 
           <div style={{ marginTop: "2.5rem", display: "grid", gap: "0.75rem" }}>
-            {ROLES.map((r) => (
-              <button key={r.key} onClick={() => setRole(r.key)} className="card-choice">
-                <span
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "1rem",
-                  }}
-                >
-                  <span style={{ display: "flex", alignItems: "center", gap: "0.9rem" }}>
-                    <span className="chip" aria-hidden>
-                      {r.mark}
-                    </span>
-                    <span>
-                      <span style={{ fontSize: "0.98rem", fontWeight: 700 }}>{r.label}</span>
-                      <span className="lede" style={{ display: "block", fontSize: "0.83rem" }}>
-                        {r.note}
-                      </span>
-                    </span>
+            <button onClick={() => setMode("user")} className="card-choice">
+              <span
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "1rem",
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: "0.9rem" }}>
+                  <span className="chip" aria-hidden>
+                    利用
                   </span>
-                  <span aria-hidden style={{ color: "var(--brand)", fontSize: "1.1rem", lineHeight: 1 }}>
-                    →
+                  <span>
+                    <span style={{ fontSize: "0.98rem", fontWeight: 700 }}>利用者として使う</span>
+                    <span className="lede" style={{ display: "block", fontSize: "0.83rem" }}>
+                      書くことも、届いたものを読むことも、同じ画面でできます
+                    </span>
                   </span>
                 </span>
-              </button>
-            ))}
+                <span aria-hidden style={{ color: "var(--brand)", fontSize: "1.1rem", lineHeight: 1 }}>
+                  →
+                </span>
+              </span>
+            </button>
+
+            <button onClick={() => setMode("admin")} className="card-choice">
+              <span
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "1rem",
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: "0.9rem" }}>
+                  <span className="chip" aria-hidden>
+                    管理
+                  </span>
+                  <span>
+                    <span style={{ fontSize: "0.98rem", fontWeight: 700 }}>管理者として見る</span>
+                    <span className="lede" style={{ display: "block", fontSize: "0.83rem" }}>
+                      配信状況と、部署ごとの状態を見る
+                    </span>
+                  </span>
+                </span>
+                <span aria-hidden style={{ color: "var(--brand)", fontSize: "1.1rem", lineHeight: 1 }}>
+                  →
+                </span>
+              </span>
+            </button>
           </div>
 
           <p className="fineprint" style={{ marginTop: "2.5rem" }}>
-            デモのため認証はありません。本番では社内アカウントで認証します。
+            デモのため認証はありません。本番では社内アカウントで認証し、利用者はこの選択なしに自分の画面へ入ります。
           </p>
         </div>
       </div>
@@ -103,11 +145,13 @@ export default function App() {
             <h1 className="title" style={{ fontSize: "1.05rem" }}>
               言いにくいことを、届ける
             </h1>
-            <p className="eyebrow">{ROLES.find((r) => r.key === role)!.label}として表示しています</p>
+            <p className="eyebrow">
+              {mode === "admin" ? "管理者として表示しています" : `${me.name} として表示しています`}
+            </p>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
-            {role !== "admin" && (
+            {mode === "user" && (
               <select
                 className="field"
                 style={{ width: "auto" }}
@@ -122,12 +166,35 @@ export default function App() {
                 ))}
               </select>
             )}
-            <button className="link-quiet" onClick={() => setRole(null)}>
-              立場を変える
+            <button className="link-quiet" onClick={() => setMode(null)}>
+              {mode === "admin" ? "利用者に戻る" : "管理者画面へ"}
             </button>
           </div>
         </div>
       </header>
+
+      {mode === "user" && (
+        <nav className="tabbar">
+          <div className="wrap" style={{ display: "flex", gap: "0.25rem" }}>
+            <button
+              className={`tab ${tab === "write" ? "tab--on" : ""}`}
+              onClick={() => setTab("write")}
+            >
+              書く
+            </button>
+            <button
+              className={`tab ${tab === "inbox" ? "tab--on" : ""}`}
+              onClick={() => {
+                setTab("inbox");
+                void refreshInbox();
+              }}
+            >
+              届いたもの
+              {inboxCount > 0 && <span className="tab-count">{inboxCount}</span>}
+            </button>
+          </div>
+        </nav>
+      )}
 
       <main className="wrap" style={{ paddingBlock: "2.25rem 1rem", flex: 1 }}>
         {stub && (
@@ -139,9 +206,13 @@ export default function App() {
           </div>
         )}
 
-        {role === "sender" && <Compose me={me} key={`s${meId}${nonce}`} />}
-        {role === "recipient" && <Inbox me={me} key={`r${meId}${nonce}`} />}
-        {role === "admin" && <Admin key={`a${nonce}`} onChanged={() => setNonce((n) => n + 1)} />}
+        {mode === "user" && tab === "write" && (
+          <Compose me={me} key={`w${meId}${nonce}`} onSent={bump} />
+        )}
+        {mode === "user" && tab === "inbox" && (
+          <Inbox me={me} key={`i${meId}${nonce}`} onChanged={refreshInbox} />
+        )}
+        {mode === "admin" && <Admin key={`a${nonce}`} onChanged={bump} />}
       </main>
 
       <footer className="wrap" style={{ paddingBlock: "1.5rem 2.5rem" }}>

@@ -9,7 +9,7 @@ import { Btn, Field, Notice } from "./ui";
 /**
  * 受信画面。扱うのは InboxItem のみで、送信者に関する情報はこの層に存在しない。
  */
-export default function Inbox({ me }: { me: User }) {
+export default function Inbox({ me, onChanged }: { me: User; onChanged?: () => void }) {
   const [items, setItems] = useState<InboxItem[] | null>(null);
 
   const load = async () => {
@@ -24,6 +24,7 @@ export default function Inbox({ me }: { me: User }) {
 
   const respond = async (id: string, kind: "ack" | "dispute") => {
     await respondAction(id, kind);
+    onChanged?.();
     void load();
   };
 

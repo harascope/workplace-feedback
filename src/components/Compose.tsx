@@ -6,7 +6,7 @@ import type { Analysis } from "@/lib/ai/schemas";
 import { USERS, isPowerSensitive, userById, type User } from "@/lib/data/users";
 import { Btn, Field, Notice, Panel } from "./ui";
 
-export default function Compose({ me }: { me: User }) {
+export default function Compose({ me, onSent }: { me: User; onSent?: () => void }) {
   const [body, setBody] = useState("");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [targetId, setTargetId] = useState("");
@@ -95,8 +95,12 @@ export default function Compose({ me }: { me: User }) {
       hasContext: !!analysis.context,
     });
     setBusy(false);
-    if (r.ok) setDone(true);
-    else setErr(r.error);
+    if (r.ok) {
+      setDone(true);
+      onSent?.();
+    } else {
+      setErr(r.error);
+    }
   };
 
   return (
