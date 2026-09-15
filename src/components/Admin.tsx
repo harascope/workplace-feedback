@@ -126,6 +126,7 @@ export default function Admin({ onChanged }: { onChanged?: () => void }) {
 
       <p className="fineprint" style={{ marginTop: "1.5rem", maxWidth: "36rem" }}>
         申告がゼロの部署は「データなし」と表示します。健全なのか、誰も声を上げられないのかは、この数字だけでは区別できないためです。
+        集計するのは配信済みの申告だけです。送信直後に数字が動くと、誰が書いたか推測されてしまうためです。
         各部署にこの評価は開示されません。
       </p>
 

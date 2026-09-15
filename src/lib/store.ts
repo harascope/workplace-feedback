@@ -180,7 +180,8 @@ export type DeptEval = {
 };
 
 export function evaluateDepts(): DeptEval[] {
-  const all = reports();
+  // 配信済みだけを数える。送信直後に数字が動くと、直前の出来事から誰が書いたか推測されるため
+  const all = reports().filter((r) => r.status === "delivered");
   return Array.from(new Set(USERS.map((u) => u.dept))).map((dept) => {
     const members = USERS.filter((u) => u.dept === dept).map((u) => u.id);
     const rs = all.filter((r) => members.includes(r.targetId));
@@ -193,13 +194,15 @@ export function evaluateDepts(): DeptEval[] {
     const ratio = heavy / rs.length;
     const targets = new Set(rs.map((r) => r.targetId));
     const level = Math.min(5, 1 + Math.round(ratio * 2) + (rs.length >= 2 ? 1 : 0));
-    const concentration = targets.size === 1 && rs.length > 1 ? "特定の1名に集中" : "複数名に分散";
+    // 1件だけでは集中か分散かを言えないので、何も付けない
+    const concentration =
+      rs.length === 1 ? "" : targets.size === 1 ? " ・ 特定の1名に集中" : " ・ 複数名に分散";
 
     return {
       dept,
       level,
       label: `レベル ${level}`,
-      detail: `重大度2以上が ${heavy}/${rs.length} ・ ${concentration}`,
+      detail: `重大度2以上が ${heavy}/${rs.length}${concentration}`,
     };
   });
 }

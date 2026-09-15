@@ -7,3 +7,4 @@ out
 next-env.d.ts
 .claude/launch.json
 tsconfig.tsbuildinfo
+.playwright-mcp/

@@ -24,14 +24,23 @@ export const userById = (id: string): User | undefined => USERS.find((u) => u.id
 
 const surname = (u: User): string => u.name.split(" ")[0];
 
-/** AI が読み取った対象者の手がかり（「佐藤さん」など）を、候補の人物に姓で突き合わせる */
-export const userFromHint = (hint: string, candidates: User[]): User | undefined =>
-  candidates.find((u) => hint.includes(surname(u)));
+/**
+ * AI が読み取った対象者の手がかり（「佐藤さん」など）を、候補の人物に突き合わせる。
+ * フルネームで一致しなければ姓で探す。同じ姓が複数いるときは決めつけず、利用者に選ばせる。
+ */
+export const userFromHint = (hint: string, candidates: User[]): User | undefined => {
+  const compact = hint.replace(/\s/g, "");
+  const full = candidates.find((u) => compact.includes(u.name.replace(/\s/g, "")));
+  if (full) return full;
+  const bySurname = candidates.filter((u) => hint.includes(surname(u)));
+  return bySurname.length === 1 ? bySurname[0] : undefined;
+};
 
 /**
  * 文中のどこかに人事担当の姓が出ていれば、その人物を返す。
  * 人事への引き継ぎを止める判定に使う。対象者の読み取りが外れたり複数名が書かれていても、
  * 当事者に届く側へは倒さないよう、手がかりの先頭一致には頼らない。
+ * 姓だけで拾うので、同じ姓の一般社員がいても迂回する側に倒れる。
  */
 export const hrMentionedIn = (text: string, candidates: User[]): User | undefined =>
   candidates.find((u) => u.isHR && text.includes(surname(u)));
