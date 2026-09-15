@@ -22,6 +22,20 @@ export const USERS: User[] = [
 
 export const userById = (id: string): User | undefined => USERS.find((u) => u.id === id);
 
+const surname = (u: User): string => u.name.split(" ")[0];
+
+/** AI が読み取った対象者の手がかり（「佐藤さん」など）を、候補の人物に姓で突き合わせる */
+export const userFromHint = (hint: string, candidates: User[]): User | undefined =>
+  candidates.find((u) => hint.includes(surname(u)));
+
+/**
+ * 文中のどこかに人事担当の姓が出ていれば、その人物を返す。
+ * 人事への引き継ぎを止める判定に使う。対象者の読み取りが外れたり複数名が書かれていても、
+ * 当事者に届く側へは倒さないよう、手がかりの先頭一致には頼らない。
+ */
+export const hrMentionedIn = (text: string, candidates: User[]): User | undefined =>
+  candidates.find((u) => u.isHR && text.includes(surname(u)));
+
 export const DEPTS = Array.from(new Set(USERS.map((u) => u.dept)));
 
 /** 自動送信のデフォルトが OFF になる相手（仕様書 3.4）。送信自体は止めない。 */

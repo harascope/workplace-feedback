@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import type { Composed, Severity } from "./ai/schemas";
 import { USERS } from "./data/users";
 
@@ -9,6 +10,9 @@ import { USERS } from "./data/users";
  * 送信者 ID は Report にしか存在しない。受信者向けの型 InboxItem は authorId を
  * 持たず、listInbox() は authorId を読まずに組み立てる。受信画面へ渡る値に
  * 送信者の情報が混ざる経路を、型のレベルで塞いでいる。
+ *
+ * 人事への引き継ぎ（Escalation）は本人が実名で出すものなので、匿名の経路とは
+ * 配列ごと分ける。受信箱・配信・部署評価は Escalation を一切読まない。
  */
 
 export type Report = {
@@ -25,6 +29,20 @@ export type Report = {
   status: "pending" | "delivered";
   composed: Composed | null;
   response: "ack" | "dispute" | null;
+  createdAt: number;
+};
+
+/**
+ * 人事への引き継ぎ（仕様書 3.1）。レベル3で本人が同意したときだけ作る。
+ * 同意がない場合の扱いは仕様書で未決定のため、何も残さない。
+ */
+export type Escalation = {
+  id: string;
+  authorId: string;
+  /** 本人が書いたそのままの記述 */
+  rawBody: string;
+  /** レベル3と判定した理由 */
+  severityReason: string;
   createdAt: number;
 };
 
@@ -71,16 +89,19 @@ const seed = (): Report[] => [
 ];
 
 // dev の HMR をまたいで保持する
-const g = globalThis as unknown as { __reports?: Report[] };
+const g = globalThis as unknown as { __reports?: Report[]; __escalations?: Escalation[] };
 g.__reports ??= seed();
+g.__escalations ??= [];
 const reports = (): Report[] => g.__reports!;
+const escalations = (): Escalation[] => g.__escalations!;
 
 export function addReport(
   r: Omit<Report, "id" | "status" | "composed" | "response" | "createdAt">,
 ): Report {
   const report: Report = {
     ...r,
-    id: `r${Date.now()}`,
+    // 時刻を ID に入れると、受信者に送信時刻が伝わり、まとめ配信の意味がなくなる
+    id: `r${randomUUID()}`,
     status: "pending",
     composed: null,
     response: null,
@@ -88,6 +109,25 @@ export function addReport(
   };
   reports().push(report);
   return report;
+}
+
+/** 送信の取り消し。配信前で、かつ送信者本人のものだけ消せる。消せたら true */
+export function cancelReport(id: string, authorId: string): boolean {
+  const all = reports();
+  const i = all.findIndex((r) => r.id === id && r.authorId === authorId && r.status === "pending");
+  if (i === -1) return false;
+  all.splice(i, 1);
+  return true;
+}
+
+export function addEscalation(e: Omit<Escalation, "id" | "createdAt">): Escalation {
+  const escalation: Escalation = { ...e, id: `e${randomUUID()}`, createdAt: Date.now() };
+  escalations().push(escalation);
+  return escalation;
+}
+
+export function listEscalations(): Escalation[] {
+  return [...escalations()];
 }
 
 /**
@@ -128,6 +168,7 @@ export function respond(id: string, kind: "ack" | "dispute"): void {
 
 export function resetStore(): void {
   g.__reports = seed();
+  g.__escalations = [];
 }
 
 /** 管理者向けの部署評価。申告ゼロは「データなし」で、レベル1とは区別する（仕様書 6.1）。 */

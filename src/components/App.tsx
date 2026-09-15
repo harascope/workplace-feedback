@@ -207,7 +207,7 @@ export default function App() {
         )}
 
         {mode === "user" && tab === "write" && (
-          <Compose me={me} key={`w${meId}${nonce}`} onSent={bump} />
+          <Compose me={me} key={`w${meId}${nonce}`} />
         )}
         {mode === "user" && tab === "inbox" && (
           <Inbox me={me} key={`i${meId}${nonce}`} onChanged={refreshInbox} />

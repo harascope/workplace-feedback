@@ -4,10 +4,13 @@ import { analyze as aiAnalyze } from "@/lib/ai/analyze";
 import { blur as aiBlur } from "@/lib/ai/blur";
 import { compose as aiCompose } from "@/lib/ai/compose";
 import type { Analysis, Severity } from "@/lib/ai/schemas";
-import { USERS } from "@/lib/data/users";
+import { USERS, userById } from "@/lib/data/users";
 import {
+  addEscalation,
   addReport,
+  cancelReport,
   evaluateDepts,
+  listEscalations,
   listInbox,
   listPending,
   markDelivered,
@@ -49,16 +52,41 @@ export async function sendAction(input: {
   body: string;
   rawBody: string;
   hasContext: boolean;
-}): Promise<Result<null>> {
+}): Promise<Result<{ id: string }>> {
   // レベル3はこのツールで扱わない。UI で止めているが、サーバー側でも拒否する。
   if (input.severity === 3) {
     return { ok: false, error: "この内容はこのツールでは送信できません。" };
   }
   try {
-    addReport(input);
-    return { ok: true, data: null };
+    const { id } = addReport(input);
+    return { ok: true, data: { id } };
   } catch (e) {
     return fail(e, "送信に失敗しました。");
+  }
+}
+
+/** 送信の取り消し。配信後は受信者の手元にあるので消さない。 */
+export async function cancelAction(authorId: string, id: string): Promise<Result<null>> {
+  if (!cancelReport(id, authorId)) {
+    return { ok: false, error: "すでに配信されたため取り消せません。" };
+  }
+  return { ok: true, data: null };
+}
+
+/**
+ * 人事への引き継ぎ（仕様書 3.1）。レベル3の画面で本人が同意したときだけ呼ばれる。
+ * 実名での相談になるため、匿名の Report とは別に保存する。
+ */
+export async function escalateAction(input: {
+  authorId: string;
+  rawBody: string;
+  severityReason: string;
+}): Promise<Result<null>> {
+  try {
+    addEscalation(input);
+    return { ok: true, data: null };
+  } catch (e) {
+    return fail(e, "引き継ぎに失敗しました。");
   }
 }
 
@@ -71,10 +99,35 @@ export async function respondAction(id: string, kind: "ack" | "dispute"): Promis
   return { ok: true, data: null };
 }
 
-export type AdminView = { pending: number; depts: DeptEval[] };
+export type AdminView = {
+  pending: number;
+  depts: DeptEval[];
+  /** 本人が実名での引き継ぎに同意したものなので、氏名を出してよい */
+  escalations: {
+    id: string;
+    authorName: string;
+    rawBody: string;
+    severityReason: string;
+    createdAt: number;
+  }[];
+};
+
+function adminView(): AdminView {
+  return {
+    pending: pendingCount(),
+    depts: evaluateDepts(),
+    escalations: listEscalations().map(({ id, authorId, rawBody, severityReason, createdAt }) => ({
+      id,
+      authorName: userById(authorId)?.name ?? authorId,
+      rawBody,
+      severityReason,
+      createdAt,
+    })),
+  };
+}
 
 export async function adminAction(): Promise<Result<AdminView>> {
-  return { ok: true, data: { pending: pendingCount(), depts: evaluateDepts() } };
+  return { ok: true, data: adminView() };
 }
 
 /**
@@ -93,7 +146,7 @@ export async function deliverAction(): Promise<Result<AdminView>> {
       }
       markDelivered(r.id, composed);
     }
-    return { ok: true, data: { pending: pendingCount(), depts: evaluateDepts() } };
+    return { ok: true, data: adminView() };
   } catch (e) {
     return fail(e, "配信に失敗しました。");
   }

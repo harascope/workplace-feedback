@@ -1,12 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { analyzeAction, blurAction, sendAction } from "@/app/actions";
+import { analyzeAction, blurAction, cancelAction, escalateAction, sendAction } from "@/app/actions";
 import type { Analysis } from "@/lib/ai/schemas";
-import { USERS, isPowerSensitive, userById, type User } from "@/lib/data/users";
+import {
+  EXTERNAL_CONTACTS,
+  USERS,
+  hrMentionedIn,
+  isPowerSensitive,
+  routeFor,
+  userById,
+  userFromHint,
+  type User,
+} from "@/lib/data/users";
 import { Btn, Field, Notice, Panel } from "./ui";
 
-export default function Compose({ me, onSent }: { me: User; onSent?: () => void }) {
+export default function Compose({ me }: { me: User }) {
   const [body, setBody] = useState("");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [targetId, setTargetId] = useState("");
@@ -14,7 +23,10 @@ export default function Compose({ me, onSent }: { me: User; onSent?: () => void 
   const [err, setErr] = useState("");
   const [prompted, setPrompted] = useState(false);
   const [blurAccepted, setBlurAccepted] = useState(false);
-  const [done, setDone] = useState(false);
+  // 取り消しに使う。画面を離れると失われるので、取り消せるのはこの画面にいる間だけ
+  const [sentId, setSentId] = useState<string | null>(null);
+  const [cancelled, setCancelled] = useState(false);
+  const [escalated, setEscalated] = useState(false);
 
   const candidates = USERS.filter((u) => u.id !== me.id);
 
@@ -27,8 +39,7 @@ export default function Compose({ me, onSent }: { me: User; onSent?: () => void 
       setBlurAccepted(false);
       setPrompted(false);
       if (r.data.targetHint) {
-        const hint = r.data.targetHint;
-        const hit = candidates.find((u) => hint.includes(u.name.split(" ")[0]));
+        const hit = userFromHint(r.data.targetHint, candidates);
         if (hit) setTargetId(hit.id);
       }
     } else {
@@ -57,16 +68,63 @@ export default function Compose({ me, onSent }: { me: User; onSent?: () => void 
     setPrompted(false);
     setBlurAccepted(false);
     setErr("");
-    setDone(false);
+    setSentId(null);
+    setCancelled(false);
+    setEscalated(false);
   };
 
-  if (done) {
+  if (sentId) {
+    const cancel = async () => {
+      setBusy(true);
+      setErr("");
+      const r = await cancelAction(me.id, sentId);
+      setBusy(false);
+      if (r.ok) {
+        setCancelled(true);
+      } else {
+        setErr(r.error);
+      }
+    };
+
     return (
       <div>
-        <Notice tone="quiet" title="受け付けました">
-          次回の配信は月曜です。すぐには届きません。送信直後に届くと、直前の出来事から誰が書いたか推測されてしまうためです。
-          <p style={{ marginTop: "0.6rem", color: "var(--sub)" }}>配信までの間は、取り消すことができます。</p>
-        </Notice>
+        {cancelled ? (
+          <Notice tone="quiet" title="取り消しました">
+            この内容は配信されません。
+          </Notice>
+        ) : (
+          <Notice tone="quiet" title="受け付けました">
+            次回の配信は月曜です。すぐには届きません。送信直後に届くと、直前の出来事から誰が書いたか推測されてしまうためです。
+            {/* 失敗は配信済みのときだけなので、取り消せる案内は消す */}
+            {!err && (
+              <p style={{ marginTop: "0.6rem", color: "var(--sub)" }}>配信前であれば、この画面から取り消せます。</p>
+            )}
+          </Notice>
+        )}
+        {err && (
+          <div style={{ marginTop: "1.25rem" }}>
+            <Notice tone="stop">{err}</Notice>
+          </div>
+        )}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem", marginTop: "1.25rem" }}>
+          {!cancelled && !err && (
+            <Btn variant="ghost" onClick={cancel} disabled={busy}>
+              {busy ? "取り消しています…" : "取り消す"}
+            </Btn>
+          )}
+          <Btn variant="ghost" onClick={reset} disabled={busy}>
+            別の内容を書く
+          </Btn>
+        </div>
+      </div>
+    );
+  }
+
+  // 同じ内容を二重に引き継がないよう、書く画面には戻さない
+  if (escalated) {
+    return (
+      <div>
+        <Notice tone="quiet">人事担当に、あなたの名前とともに届きました。</Notice>
         <div style={{ marginTop: "1.25rem" }}>
           <Btn variant="ghost" onClick={reset}>
             別の内容を書く
@@ -82,6 +140,27 @@ export default function Compose({ me, onSent }: { me: User; onSent?: () => void 
   const riskHigh = analysis?.identifiability === "high" && !blurAccepted;
   const target = targetId ? userById(targetId) : undefined;
   const powerBlock = !!target && isPowerSensitive(target);
+  // 人事担当が書かれていれば、人事への引き継ぎは当事者に届きうるので出さない（仕様書 3.4）。
+  // 対象者の読み取りが外れても引き継がない側に倒すため、本文も合わせて見る
+  const hr = analysis ? hrMentionedIn(`${analysis.targetHint ?? ""}\n${body}`, candidates) : undefined;
+  const hrNotice = hr ? routeFor(hr).notice : null;
+
+  const escalate = async () => {
+    if (!analysis) return;
+    setBusy(true);
+    setErr("");
+    const r = await escalateAction({
+      authorId: me.id,
+      rawBody: body,
+      severityReason: analysis.severityReason,
+    });
+    setBusy(false);
+    if (r.ok) {
+      setEscalated(true);
+    } else {
+      setErr(r.error);
+    }
+  };
 
   const send = async () => {
     if (!analysis || !targetId) return;
@@ -96,8 +175,7 @@ export default function Compose({ me, onSent }: { me: User; onSent?: () => void 
     });
     setBusy(false);
     if (r.ok) {
-      setDone(true);
-      onSent?.();
+      setSentId(r.data.id);
     } else {
       setErr(r.error);
     }
@@ -142,13 +220,24 @@ export default function Compose({ me, onSent }: { me: User; onSent?: () => void 
           </p>
           <p style={{ marginTop: "0.9rem", marginBottom: "0.2rem" }}>相談先</p>
           <ul style={{ listStyle: "disc", paddingLeft: "1.3rem", color: "var(--sub)" }}>
-            <li>各都道府県労働局 総合労働相談コーナー</li>
-            <li>警察相談専用電話 #9110</li>
-            <li>法テラス（弁護士相談）</li>
+            {EXTERNAL_CONTACTS.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
           </ul>
-          <p className="fineprint" style={{ marginTop: "0.9rem" }}>
-            書いた内容は保存されています。あなたが望めば、人事へ引き継ぐことができます。
-          </p>
+          {hrNotice ? (
+            <p style={{ marginTop: "0.9rem" }}>{hrNotice}</p>
+          ) : (
+            <>
+              <p className="fineprint" style={{ marginTop: "0.9rem" }}>
+                あなたが望めば、書いた内容を実名で人事へ引き継げます。引き継がない限り、どこにも保存されません。
+              </p>
+              <div style={{ marginTop: "0.9rem" }}>
+                <Btn variant="ghost" onClick={escalate} disabled={busy}>
+                  {busy ? "引き継いでいます…" : "人事へ引き継ぐ"}
+                </Btn>
+              </div>
+            </>
+          )}
         </Notice>
       )}
 

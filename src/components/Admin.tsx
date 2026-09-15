@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { adminAction, deliverAction, type AdminView } from "@/app/actions";
-import { Btn } from "./ui";
+import { Btn, Field } from "./ui";
 
 /**
  * 5 段階の目盛り。申告ゼロの部署には表示しない。
@@ -76,7 +76,7 @@ export default function Admin({ onChanged }: { onChanged?: () => void }) {
             <span className={view.pending === 0 ? "stat stat--zero" : "stat"}>{view.pending}</span>
             <span className="body-text">件 未配信</span>
           </div>
-          <p className="fineprint">通常は毎週月曜に自動配信されます</p>
+          <p className="fineprint">本番は毎週月曜に自動配信。デモではここから手動で配信します</p>
         </div>
         <Btn variant="accent" onClick={deliver} disabled={view.pending === 0 || delivering}>
           {delivering ? "配信しています…" : "いま配信する"}
@@ -127,6 +127,41 @@ export default function Admin({ onChanged }: { onChanged?: () => void }) {
       <p className="fineprint" style={{ marginTop: "1.5rem", maxWidth: "36rem" }}>
         申告がゼロの部署は「データなし」と表示します。健全なのか、誰も声を上げられないのかは、この数字だけでは区別できないためです。
         各部署にこの評価は開示されません。
+      </p>
+
+      <h2 className="label" style={{ margin: "2.25rem 0 0.9rem" }}>
+        人事への引き継ぎ{view.escalations.length > 0 && `（${view.escalations.length} 件）`}
+      </h2>
+
+      {view.escalations.length === 0 ? (
+        <p className="fineprint">ありません</p>
+      ) : (
+        <div style={{ display: "grid", gap: "0.75rem" }}>
+          {view.escalations.map((e) => (
+            <article key={e.id} className="card" style={{ padding: "1.1rem 1.375rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "baseline",
+                  justifyContent: "space-between",
+                  gap: "0.5rem 1rem",
+                }}
+              >
+                <span style={{ fontSize: "0.95rem", fontWeight: 700 }}>{e.authorName}</span>
+                <span className="fineprint">{new Date(e.createdAt).toLocaleString("ja-JP")}</span>
+              </div>
+              <div style={{ display: "grid", gap: "0.9rem", marginTop: "0.75rem" }}>
+                <Field label="判定理由">{e.severityReason}</Field>
+                <Field label="本人が書いた内容">{e.rawBody}</Field>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <p className="fineprint" style={{ marginTop: "1.5rem", maxWidth: "36rem" }}>
+        本人が実名での引き継ぎに同意したものだけが表示されます。匿名の申告とは別に扱い、部署ごとの状態には含めません。
       </p>
     </div>
   );
