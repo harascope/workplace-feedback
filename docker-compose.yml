@@ -14,9 +14,11 @@ services:
       - next_cache:/app/.next
     environment:
       - NODE_ENV=development
-      # 各自の .env.local から ANTHROPIC_API_KEY を引き継ぐ。
-      # 未設定でもキーワード判定のスタブで起動する。
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    # ANTHROPIC_API_KEY はここで渡さない。
+    # 上のボリュームマウントで .env.local がコンテナ内にも見えるので、
+    # Next.js が自分で読み込む（ローカル実行時と同じ挙動）。
+    # ここで空文字を渡すと、実プロセスの環境変数が .env.local より優先され、
+    # キーを入れてもスタブのままになる。
     # -H 0.0.0.0 が無いと 127.0.0.1 にしかバインドされず、
     # ホストから localhost:3000 でアクセスできなくなる
     command: npx next dev -H 0.0.0.0
