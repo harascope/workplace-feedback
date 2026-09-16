@@ -10,8 +10,10 @@ import {
   inboxAction,
   resetAction,
   respondAction,
+  seedDemoAction,
   sendAction,
   stubModeAction,
+  type AdminView,
 } from "./actions";
 
 // api.ts をまるごと差し替える。呼ばれ方の確認と、成功/失敗の変換だけをテストする
@@ -33,6 +35,7 @@ vi.mock("@/lib/api", () => ({
   getAdmin: vi.fn(),
   deliver: vi.fn(),
   resetDemo: vi.fn(),
+  seedDemo: vi.fn(),
   getMeta: vi.fn(),
 }));
 
@@ -47,7 +50,20 @@ const analysis = {
   organized: "会議で発言を遮られた。",
 };
 
-const adminView = { pending: 1, depts: [], escalations: [] };
+const adminView: AdminView = {
+  pending: 1,
+  depts: [],
+  escalations: [],
+  severityMix: { level1: 0, level2: 0 },
+  delivery: {
+    nextAt: Date.parse("2026-09-21T00:00:00Z"),
+    intervalDays: 7,
+    oldestPendingDays: null,
+    deliveredTotal: 0,
+  },
+  levelMax: 5,
+  deptAlertMinMembers: 3,
+};
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -184,6 +200,27 @@ describe("resetAction", () => {
     vi.mocked(api.resetDemo).mockResolvedValue(undefined);
 
     await expect(resetAction()).resolves.toEqual({ ok: true, data: null });
+  });
+});
+
+describe("seedDemoAction", () => {
+  it("api.seedDemo の結果をそのまま渡す", async () => {
+    const seeded = { ...adminView, pending: 8 };
+    vi.mocked(api.seedDemo).mockResolvedValue(seeded);
+
+    await expect(seedDemoAction()).resolves.toEqual({ ok: true, data: seeded });
+    // 初期化とは別経路。reset の件数は E2E が依存しているので混ぜない
+    expect(api.resetDemo).not.toHaveBeenCalled();
+  });
+
+  it("失敗はフォールバック文言にする", async () => {
+    vi.mocked(api.seedDemo).mockRejectedValue(new TypeError("fetch failed"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(seedDemoAction()).resolves.toEqual({
+      ok: false,
+      error: "デモ用データの投入に失敗しました。",
+    });
   });
 });
 

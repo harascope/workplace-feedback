@@ -190,7 +190,18 @@ export async function respond(id: string, kind: "ack" | "dispute"): Promise<void
 
 // ---- GET /admin, POST /admin/deliver ----
 
-export type DeptEval = { dept: string; level: number | null; label: string; detail: string };
+export type DeptEval = {
+  dept: string;
+  level: number | null;
+  label: string;
+  detail: string;
+  /** 在籍人数。母数下限の説明に使う。申告の件数ではない */
+  memberCount: number;
+  /** 母数下限に満たないか（仕様書 6.2）。満たないなら部署単位のアラートを出さない */
+  belowMinMembers: boolean;
+  /** 部署アラートが出ているか（仕様書 6.2）。件数は出さない */
+  alert: boolean;
+};
 
 export type AdminView = {
   pending: number;
@@ -203,12 +214,36 @@ export type AdminView = {
     /** epoch ミリ秒。api は ISO 文字列で返すが、画面側の型（Date.now() 由来）に合わせて変換する */
     createdAt: number;
   }[];
+  /** 配信済みの重大度の内訳。全社の合計のみで、部署 × 重大度の表は作らない */
+  severityMix: { level1: number; level2: number };
+  delivery: {
+    /** 次のまとめ配信。epoch ミリ秒 */
+    nextAt: number;
+    intervalDays: number;
+    /** いちばん古い未配信が待っている日数。未配信が無ければ null */
+    oldestPendingDays: number | null;
+    deliveredTotal: number;
+  };
+  /** 部署評価の段階数。5 が最も危険（仕様書 6.1） */
+  levelMax: number;
+  /** 部署アラートを出す母数の下限（仕様書 6.2） */
+  deptAlertMinMembers: number;
 };
 
 const adminResSchema = z
   .object({
     pending: z.number(),
-    depts: z.array(z.object({ dept: z.string(), level: z.number().nullable(), label: z.string(), detail: z.string() })),
+    depts: z.array(
+      z.object({
+        dept: z.string(),
+        level: z.number().nullable(),
+        label: z.string(),
+        detail: z.string(),
+        member_count: z.number(),
+        below_min_members: z.boolean(),
+        alert: z.boolean(),
+      }),
+    ),
     escalations: z.array(
       z.object({
         id: z.string(),
@@ -218,11 +253,28 @@ const adminResSchema = z
         created_at: z.string(),
       }),
     ),
+    severity_mix: z.object({ level1: z.number(), level2: z.number() }),
+    delivery: z.object({
+      next_at: z.string(),
+      interval_days: z.number(),
+      oldest_pending_days: z.number().nullable(),
+      delivered_total: z.number(),
+    }),
+    level_max: z.number(),
+    dept_alert_min_members: z.number(),
   })
   .transform(
     (r): AdminView => ({
       pending: r.pending,
-      depts: r.depts,
+      depts: r.depts.map((d) => ({
+        dept: d.dept,
+        level: d.level,
+        label: d.label,
+        detail: d.detail,
+        memberCount: d.member_count,
+        belowMinMembers: d.below_min_members,
+        alert: d.alert,
+      })),
       escalations: r.escalations.map((e) => ({
         id: e.id,
         authorName: e.author_name,
@@ -231,6 +283,15 @@ const adminResSchema = z
         // epoch ミリ秒。api は ISO 文字列で返すが、画面側の型（Date.now() 由来）に合わせて変換する
         createdAt: new Date(e.created_at).getTime(),
       })),
+      severityMix: r.severity_mix,
+      delivery: {
+        nextAt: new Date(r.delivery.next_at).getTime(),
+        intervalDays: r.delivery.interval_days,
+        oldestPendingDays: r.delivery.oldest_pending_days,
+        deliveredTotal: r.delivery.delivered_total,
+      },
+      levelMax: r.level_max,
+      deptAlertMinMembers: r.dept_alert_min_members,
     }),
   );
 
@@ -259,4 +320,9 @@ export async function createEscalation(input: {
 
 export async function resetDemo(): Promise<void> {
   await call<undefined>("/admin/reset", z.undefined(), { method: "POST" });
+}
+
+/** デモ用のサンプルデータを入れる。/admin/reset とは別経路（reset の件数は E2E が依存している） */
+export async function seedDemo(): Promise<AdminView> {
+  return call("/admin/seed-demo", adminResSchema, { method: "POST" });
 }

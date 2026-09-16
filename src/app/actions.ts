@@ -96,6 +96,14 @@ export async function deliverAction(): Promise<Result<AdminView>> {
   return run(() => api.deliver(), "配信に失敗しました。");
 }
 
+/**
+ * デモ用のサンプルデータを入れる（仕様書 6 章の画面を、空でない状態で見せるため）。
+ * 初期化（resetAction）とは別経路。初期化の件数は E2E が依存しているので変えない。
+ */
+export async function seedDemoAction(): Promise<Result<AdminView>> {
+  return run(() => api.seedDemo(), "デモ用データの投入に失敗しました。");
+}
+
 export async function resetAction(): Promise<Result<null>> {
   return run(async () => {
     await api.resetDemo();

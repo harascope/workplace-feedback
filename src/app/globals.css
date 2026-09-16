@@ -465,6 +465,138 @@
   border-bottom-color: var(--brand);
 }
 
+/* 管理者ダッシュボード ---------------------------------------------------- */
+/* 数字が主役。判断材料を出すのが管理者画面の役目なので（仕様書 6.1）、
+   未配信件数と部署のレベルは本文より明らかに大きく置く。
+   補足の文字色は --faint まで落とさず --sub に留める。白地で沈んで読めなくなるため。 */
+.stat--hero {
+  font-size: 3rem;
+  letter-spacing: -0.02em;
+}
+
+.stat--mini {
+  font-size: 1.7rem;
+}
+
+/* 指標の並び。400px 幅では1列に落ちる */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.7rem;
+}
+
+.metric {
+  background: linear-gradient(180deg, #ffffff 0%, var(--surface-tint) 100%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--e1), var(--sheen);
+  padding: 0.85rem 1rem;
+}
+
+.metric__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--sub);
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+}
+
+.metric__value {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+}
+
+.metric__unit {
+  font-size: 0.78rem;
+  color: var(--sub);
+}
+
+/* 部署カード */
+.dept-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem 1.25rem;
+  padding: 1.15rem 1.375rem;
+}
+
+/* 閾値を超えた部署。塗りは足さず、左の罫と縁だけで重さを示す */
+.dept-card--alert {
+  border-color: var(--stop-line);
+  border-left: 3px solid var(--stop);
+}
+
+.dept-name {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.dept-detail {
+  font-size: 0.8rem;
+  line-height: 1.8;
+  color: var(--sub);
+}
+
+/* レベルは「5段階中いくつか」が一目で分かる形にする。数字だけだと向きが読めない */
+.level {
+  display: flex;
+  align-items: baseline;
+  gap: 0.2rem;
+  font-feature-settings: "tnum" 1;
+}
+
+.level__num {
+  font-size: 2.15rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* 「5 段階中」を数字の前に置く。数字だけだと申告の重大度レベルと取り違えられる */
+.level__scale {
+  font-size: 0.78rem;
+  color: var(--sub);
+  white-space: nowrap;
+}
+
+/* 申告ゼロ。レベル1（安全）と同じ見た目にしない（仕様書 6.1） */
+.level__none {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--sub);
+  white-space: nowrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+  color: var(--sub);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.7;
+  white-space: nowrap;
+}
+
+.badge--alert {
+  color: var(--stop);
+  background: var(--stop-bg);
+  border-color: var(--stop-line);
+}
+
+/* 実名と原文が出る唯一の場所。他の情報と同じ見た目で並べない（仕様書 3.1） */
+.card--heavy {
+  border-color: var(--stop-line);
+  border-left: 3px solid var(--stop);
+  box-shadow: var(--e2);
+}
+
 /* 自分の受信件数。自分にしか見えないので件数を出してよい */
 .tab-count {
   display: inline-flex;
