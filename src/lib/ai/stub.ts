@@ -4,11 +4,11 @@ import type { Analysis, Composed, Severity } from "./schemas";
 /**
  * API キー無しでデモを動かすためのスタブ。
  *
- * ANTHROPIC_API_KEY が未設定のときだけ使われる。キーを設定すれば実 API に切り替わり、
+ * GEMINI_API_KEY が未設定のときだけ使われる。キーを設定すれば実 API に切り替わり、
  * このファイルは一切呼ばれない。UI の分岐（欠落の促し・特定リスク・レベル3停止・
  * 権力差・まとめ配信）を確認するためのものであって、文面の質は実 API とは別物。
  */
-export const isStubMode = (): boolean => !process.env.ANTHROPIC_API_KEY;
+export const isStubMode = (): boolean => !process.env.GEMINI_API_KEY;
 
 const LEVEL3 = ["殴", "叩か", "蹴", "暴行", "脅", "殺す", "触ら", "性的", "わいせつ", "つきまと", "死にたい"];
 const LEVEL2 = ["怒鳴", "無視", "仲間外れ", "毎回", "いつも", "続いて", "何度も", "残業", "押し付け"];

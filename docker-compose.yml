@@ -14,7 +14,7 @@ services:
       - next_cache:/app/.next
     environment:
       - NODE_ENV=development
-    # ANTHROPIC_API_KEY はここで渡さない。
+    # GEMINI_API_KEY はここで渡さない。
     # 上のボリュームマウントで .env.local がコンテナ内にも見えるので、
     # Next.js が自分で読み込む（ローカル実行時と同じ挙動）。
     # ここで空文字を渡すと、実プロセスの環境変数が .env.local より優先され、

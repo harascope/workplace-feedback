@@ -17,7 +17,7 @@ Docker Desktop が動いていればよい。Node のバージョン差やネイ
 cp .env.example .env.local
 ```
 
-`.env.local` に Anthropic の API キーを入れる（無くても起動する。下記参照）。
+`.env.local` に Gemini の API キー（`GEMINI_API_KEY`）を入れる（無くても起動する。下記参照）。
 
 ```bash
 docker compose up
@@ -53,7 +53,7 @@ npm install
 cp .env.example .env.local
 ```
 
-`.env.local` に Anthropic の API キーを入れる。`NEXT_PUBLIC_` は付けないこと。
+`.env.local` に Gemini の API キー（`GEMINI_API_KEY`）を入れる。`NEXT_PUBLIC_` は付けないこと。
 
 ```bash
 npm run dev
@@ -69,7 +69,7 @@ http://localhost:3000
 | `src/lib/ai/blur.ts` | 特定されにくい表現への書き直し |
 | `src/lib/ai/compose.ts` | 受信者向けフィードバック生成（what / why / how） |
 | `src/lib/ai/schemas.ts` | 出力の zod スキーマ |
-| `src/lib/ai/client.ts` | Anthropic 呼び出し。スキーマ検証に失敗したら理由を添えて再試行 |
+| `src/lib/ai/client.ts` | Gemini 呼び出し（`gemini-3.1-flash-lite`）。スキーマ検証に失敗したら理由を添えて再試行 |
 | `src/lib/store.ts` | インメモリストア。開発サーバー再起動で消える |
 | `src/app/actions.ts` | Server Actions。API キーに触れる唯一の経路 |
 | `src/components/` | 画面 |
@@ -117,7 +117,7 @@ AI の 4 関数は UI と DB を知らない。入力を受けて構造化され
 
 ## API キー無しで動かす（スタブ）
 
-`ANTHROPIC_API_KEY` が未設定のときは、AI 呼び出しが `src/lib/ai/stub.ts` の
+`GEMINI_API_KEY` が未設定のときは、AI 呼び出しが `src/lib/ai/stub.ts` の
 簡易な代替処理に置き換わり、画面上部に「スタブ動作中」と表示される。
 UI の分岐（欠落の促し・特定リスク・レベル3停止・権力差・まとめ配信）は
 このままひととおり確認できるが、文面の質は実 API とは別物。
@@ -200,8 +200,12 @@ healthy を待ってから古いイメージを片付ける（今の版と1つ�
   `docker compose -p workplace-feedback up -d`
 - 止める: `ssh ubuntu@192.168.0.220 'cd /opt/workplace-feedback && docker compose -p workplace-feedback down'`
 
-### API キーを入れない
+### API キー（Gemini）
 
-本番に `ANTHROPIC_API_KEY` は設定せず、スタブで動かす。認証なしで公開するので、キーを入れると
-第三者の操作がそのまま課金につながる。キーを入れるなら、先に公開範囲を絞ること（Cloudflare Access など）。
+鍵はイメージに焼かない。VM の `/opt/workplace-feedback/secrets.env` に `GEMINI_API_KEY=...` を置き、
+compose の `env_file`（`required: false`）から実行時に読ませる。置いていなければスタブのまま起動する。
+`deploy/deploy.sh` は `secrets.env` を作らないし上書きもしない（`.env` に書くのは `TAG` だけ）。
+
+認証なしで公開しているので、鍵を入れた状態では第三者の操作がそのまま課金につながる。
+絞るなら公開範囲を先に制限すること（Cloudflare Access など）。
 コンテナを再起動するとデータは消える（インメモリのため、仕様どおり）。

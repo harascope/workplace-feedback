@@ -6,6 +6,11 @@ services:
   feedback:
     image: workplace-feedback:${TAG}
     restart: unless-stopped
+    # 鍵はイメージに焼かず、VM 側のファイルから実行時に読む。
+    # 置いていなければスタブのまま起動する（required: false）
+    env_file:
+      - path: ./secrets.env
+        required: false
     # ホストにポートを出さない。外部へは cloudflared から feedback:3000 として渡す
     expose:
       - "3000"

@@ -200,7 +200,7 @@ export default function App() {
         {stub && (
           <div className="notice notice--warn" style={{ marginBottom: "1.75rem" }}>
             <div className="fineprint" style={{ color: "var(--warn)" }}>
-              スタブ動作中。ANTHROPIC_API_KEY が未設定のため、AI 呼び出しは簡易な代替処理に置き換わっています。
+              スタブ動作中。GEMINI_API_KEY が未設定のため、AI 呼び出しは簡易な代替処理に置き換わっています。
               画面の分岐は確認できますが、文面の質は実際のものではありません。
             </div>
           </div>

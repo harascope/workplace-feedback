@@ -159,5 +159,5 @@ export async function resetAction(): Promise<Result<null>> {
 
 /** スタブ動作中かどうか。画面に明示するために使う。 */
 export async function stubModeAction(): Promise<boolean> {
-  return !process.env.ANTHROPIC_API_KEY;
+  return !process.env.GEMINI_API_KEY;
 }

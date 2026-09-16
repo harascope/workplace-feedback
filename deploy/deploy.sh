@@ -28,9 +28,11 @@ echo "==> イメージを ${VM} へ送る"
 docker save "${IMAGE}:${TAG}" | gzip | ssh "${VM}" 'gunzip | docker load' ||
   die "イメージの転送に失敗した。ssh ${VM} が通るか確認する"
 
-# 3. compose と .env を置く
+# 3. compose と .env を置く。/opt は root 所有なので、初回だけ sudo で作って持ち主を移す。
+#    鍵を書いた secrets.env はここでは作らないし、触らない（.env に書くのは TAG だけ）
 echo "==> ${REMOTE_DIR} に compose と .env を置く"
-ssh "${VM}" "mkdir -p ${REMOTE_DIR}" || die "${REMOTE_DIR} を作れなかった"
+ssh "${VM}" "[ -d ${REMOTE_DIR} ] || { sudo mkdir -p ${REMOTE_DIR} && sudo chown ubuntu:ubuntu ${REMOTE_DIR}; }" ||
+  die "${REMOTE_DIR} を作れなかった"
 scp -q deploy/docker-compose.yml "${VM}:${REMOTE_DIR}/docker-compose.yml" || die "compose を送れなかった"
 echo "TAG=${TAG}" | ssh "${VM}" "cat > ${REMOTE_DIR}/.env" || die ".env を書けなかった"
 

@@ -1,18 +1,18 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import type { z } from "zod";
 
-export const MODEL = "claude-sonnet-4-6";
+export const MODEL = "gemini-3.1-flash-lite";
 
-let client: Anthropic | null = null;
+let client: GoogleGenAI | null = null;
 
-function getClient(): Anthropic {
+function getClient(): GoogleGenAI {
   if (!client) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error("ANTHROPIC_API_KEY が設定されていません（.env.local を確認してください）");
+      throw new Error("GEMINI_API_KEY が設定されていません（.env.local を確認してください）");
     }
-    client = new Anthropic({ apiKey });
+    client = new GoogleGenAI({ apiKey });
   }
   return client;
 }
@@ -47,13 +47,17 @@ export async function callStructured<T>(
         ? prompt
         : `${prompt}\n\n## 直前の出力は不正でした\n理由: ${lastError}\nJSONのみを、指定したキーと型のとおりに出力し直してください。`;
 
-    const res = await getClient().messages.create({
+    const res = await getClient().models.generateContent({
       model: MODEL,
-      max_tokens: maxTokens,
-      messages: [{ role: "user", content }],
+      contents: content,
+      config: {
+        // JSON で返させる。それでも崩れることはあるので extractJson と再試行は残す
+        responseMimeType: "application/json",
+        maxOutputTokens: maxTokens,
+      },
     });
 
-    const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+    const text = res.text ?? "";
 
     try {
       return schema.parse(extractJson(text));

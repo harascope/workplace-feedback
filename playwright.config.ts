@@ -27,6 +27,6 @@ export default defineConfig({
     timeout: 300_000,
     reuseExistingServer: false,
     // 空にしてスタブを強制する。実 API は呼ばない
-    env: { ANTHROPIC_API_KEY: "" },
+    env: { GEMINI_API_KEY: "" },
   },
 });

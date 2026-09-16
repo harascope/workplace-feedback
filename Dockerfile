@@ -21,7 +21,7 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     HOSTNAME=0.0.0.0 \
     PORT=3000
-# ANTHROPIC_API_KEY は設定しない。キー無しのスタブで動かす方針（README「デプロイ」参照）
+# GEMINI_API_KEY はイメージに焼かない。実行時に compose の env_file から渡す（README「デプロイ」参照）
 USER node
 # standalone は依存を同梱するので node_modules はコピーしない。public ディレクトリは無い
 COPY --from=build --chown=node:node /app/.next/standalone ./

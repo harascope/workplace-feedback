@@ -3,6 +3,8 @@ node_modules
 out
 .env
 .env.local
+# 本番の鍵を書くファイル。コミットしない
+secrets.env
 *.tsbuildinfo
 next-env.d.ts
 .claude/launch.json

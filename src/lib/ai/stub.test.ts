@@ -9,13 +9,13 @@ const NAMES = ["山田 太郎", "佐藤 健一", "伊藤 彩"];
 
 afterEach(() => {
   // setup で空にしたキーへ戻す
-  vi.stubEnv("ANTHROPIC_API_KEY", "");
+  vi.stubEnv("GEMINI_API_KEY", "");
 });
 
 describe("isStubMode", () => {
   it("キーが空ならスタブ、入っていれば実 API", () => {
     expect(isStubMode()).toBe(true);
-    vi.stubEnv("ANTHROPIC_API_KEY", "sk-test");
+    vi.stubEnv("GEMINI_API_KEY", "sk-test");
     expect(isStubMode()).toBe(false);
   });
 });
@@ -38,7 +38,7 @@ describe("キーが無いときの analyze / blur / compose", () => {
   });
 
   it("キーを入れても SDK はモックなので、外へは出ずに失敗する", async () => {
-    vi.stubEnv("ANTHROPIC_API_KEY", "sk-test");
+    vi.stubEnv("GEMINI_API_KEY", "sk-test");
     await expect(compose("会議で遮られた")).rejects.toThrow(/実 API/);
   });
 });

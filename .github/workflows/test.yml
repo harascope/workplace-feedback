@@ -30,7 +30,7 @@ jobs:
       - run: npm test
 
       - run: npx playwright install --with-deps chromium
-      # ANTHROPIC_API_KEY は渡さない。playwright.config.ts でも空にしてスタブで動かす
+      # GEMINI_API_KEY は渡さない。playwright.config.ts でも空にしてスタブで動かす
       - run: npm run test:e2e
 
       - name: Upload Playwright report
