@@ -35,12 +35,17 @@ api は外部公開しない。ブラウザは web にだけ触れ、web の Ser
   "severity_reason": "単発の言動と読める",
   "identifiability": "low",
   "identifiability_reason": "…",
-  "organized": "先週の定例会議にて、発言を遮って話し始めました。"
+  "organized": "先週の定例会議にて、発言を遮って話し始めました。",
+  "rephrase_hint": null
 }
 ```
 - `severity`: `1 | 2 | 3`
 - `identifiability`: `"low" | "medium" | "high"`
 - `context` と `target_hint` は null になりうる
+- `rephrase_hint`: `actions` に観察可能な行動が1つも無く、身体的特徴・容姿など行動でない
+  属性への言及だけの場合に、行動への言い換え案を1文で返す（例:「部長の足が臭すぎる」→
+  「（本人に）指摘しても改善されない」）。それ以外は null。AI が `actions` を勝手に埋めて
+  人格攻撃を行動として通すことはしない。書き直すかどうかは送信者が選ぶ
 - 失敗時 502（AI 呼び出しが3回とも失敗）
 
 ### `POST /blur`

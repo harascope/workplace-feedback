@@ -92,6 +92,7 @@ const analyzeResSchema = z
     identifiability: z.enum(["low", "medium", "high"]),
     identifiability_reason: z.string(),
     organized: z.string(),
+    rephrase_hint: z.string().nullable().default(null),
   })
   .transform(
     (r): Analysis => ({
@@ -103,6 +104,7 @@ const analyzeResSchema = z
       identifiability: r.identifiability,
       identifiabilityReason: r.identifiability_reason,
       organized: r.organized,
+      rephraseHint: r.rephrase_hint,
     }),
   );
 

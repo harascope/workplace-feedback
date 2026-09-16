@@ -26,6 +26,9 @@ OBSERVABLE = [
 MANNER = ["口調", "言い方", "話し方", "きつ", "きびし", "厳し", "威圧", "高圧", "冷た", "そっけな"]
 # 書き手の評価・相手の内面。相手が認知できないので行動として扱わない
 EVALUATIVE = ["態度", "感じ", "やる気", "嫌", "見下", "馬鹿にさ", "冷た", "雰囲気"]
+# 身体的特徴・容姿。相手が変えられない属性で、行動ではない。actions は空にし、
+# rephrase_hint（「指摘しても改善されない」への言い換え案）だけを出す
+PHYSICAL_TRAIT = ["臭", "デブ", "ハゲ", "薄毛", "体型", "容姿", "見た目", "身長", "体臭"]
 
 CONTEXT_HINTS = [
     "会議", "定例", "1on1", "ミーティング", "朝礼", "客先", "帰り", "昼",
@@ -66,6 +69,19 @@ def _actions_of(body: str) -> list[Action]:
     ]
 
 
+def _rephrase_hint_of(body: str, actions: list[Action]) -> str | None:
+    """観察可能な行動が1つも無く、身体的特徴への言及だけの場合に言い換え案を出す。
+
+    「actions が空かどうか」ではなく「observable な行動が1つもあるか」で判定する
+    （画面側の hasAction・has_observable_action と同じ基準に合わせる）。
+    AI が actions を勝手に埋めることはしない（人格攻撃がそのまま通る経路になるため）。
+    案の提示だけで、書き直すかどうかは送信者が選ぶ。
+    """
+    if any(a.observable for a in actions) or not has(body, PHYSICAL_TRAIT):
+        return None
+    return "（本人に）指摘しても改善されない"
+
+
 def stub_analyze(body: str, candidate_names: Sequence[str]) -> Analysis:
     severity, reason = _severity_of(body)
     actions = _actions_of(body)
@@ -87,6 +103,7 @@ def stub_analyze(body: str, candidate_names: Sequence[str]) -> Analysis:
             "その場にいた人数が限られ、書き手が絞り込まれる可能性があります" if identifying else ""
         ),
         organized=body.strip(),
+        rephrase_hint=_rephrase_hint_of(body, actions),
     )
 
 

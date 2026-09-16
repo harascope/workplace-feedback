@@ -26,6 +26,7 @@ const analysis = (over: Partial<Analysis> = {}): Analysis => ({
   identifiability: "low",
   identifiabilityReason: "",
   organized: "会議で発言を遮られた。",
+  rephraseHint: null,
   ...over,
 });
 
@@ -51,6 +52,27 @@ async function sendOnce() {
 
 beforeEach(() => {
   vi.resetAllMocks();
+});
+
+describe("何があったかの促し", () => {
+  const noAction = (rephraseHint: string | null) =>
+    analysis({ actions: [{ description: "部長の足が臭すぎる", observable: false }], rephraseHint });
+
+  it("行動が取れず言い換え案があるときは、促しの下に案を出す", async () => {
+    await writeAndAnalyze("部長の足が臭すぎる", noAction("（本人に）指摘しても改善されない"));
+
+    await screen.findByText("何があったかが書かれていません");
+    expect(
+      screen.getByText((text) => text.includes("（本人に）指摘しても改善されない")),
+    ).toBeInTheDocument();
+  });
+
+  it("言い換え案が無いとき（なんかつらい等）は、案の文を出さない", async () => {
+    await writeAndAnalyze("なんかつらい", noAction(null));
+
+    await screen.findByText("何があったかが書かれていません");
+    expect(screen.queryByText(/のように、相手の対応として書くと届けられます/)).not.toBeInTheDocument();
+  });
 });
 
 describe("送信後の完了画面", () => {

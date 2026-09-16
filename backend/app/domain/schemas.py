@@ -24,6 +24,11 @@ class Analysis(BaseModel):
     severity: Literal[1, 2, 3]
     severity_reason: str
     identifiability: Literal["low", "medium", "high"]
+    rephrase_hint: str | None = None
+    """actions が空で、身体的特徴・人格など行動でない何かに触れている場合の言い換え案。
+    AI が actions を勝手に埋めることはしない（人格攻撃がそのまま通る経路になるため）。
+    ここは案の提示だけで、書き直すかどうかは送信者が選ぶ。本当に何も書かれていない
+    入力（なんかつらい等）では null のまま。"""
     identifiability_reason: str
     organized: str
     """送信者が書いた内容を、相手が読む形に整えた文面。"""

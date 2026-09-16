@@ -26,6 +26,8 @@ export const analysisSchema = z.object({
   identifiabilityReason: z.string(),
   /** 送信者が書いた内容を、相手が読む形に整えた文面 */
   organized: z.string(),
+  /** actions が空で身体的特徴等に触れているときの、行動への言い換え案。無ければ null */
+  rephraseHint: z.string().nullable().default(null),
 });
 export type Analysis = z.infer<typeof analysisSchema>;
 

@@ -48,6 +48,7 @@ const analysis = {
   identifiability: "low" as const,
   identifiabilityReason: "",
   organized: "会議で発言を遮られた。",
+  rephraseHint: null,
 };
 
 const adminView: AdminView = {

@@ -335,9 +335,16 @@ export default function Compose({ me }: { me: User }) {
                   相手が思い出せるよう、どんな場面だったかを足してもらえますか。日付まで正確でなくてかまいません。
                 </p>
               ) : (
-                <p>
-                  今の書き方だと、相手は何を指しているか分からない可能性があります。相手が「した」ことを足してもらえますか。
-                </p>
+                <>
+                  <p>
+                    今の書き方だと、相手は何を指しているか分からない可能性があります。相手が「した」ことを足してもらえますか。
+                  </p>
+                  {analysis.rephraseHint && (
+                    <p style={{ marginTop: "0.6rem" }}>
+                      例えば「{analysis.rephraseHint}」のように、相手の対応として書くと届けられます。
+                    </p>
+                  )}
+                </>
               )}
               <div style={{ marginTop: "0.9rem" }}>
                 <Btn variant="ghost" onClick={() => setPrompted(true)}>
