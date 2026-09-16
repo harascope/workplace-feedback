@@ -8,22 +8,23 @@ import Compose from "./Compose";
 import Inbox from "./Inbox";
 
 /**
- * 入口は「利用者」と「管理者」の2つだけ。
+ * 画面は「送る」「受け取りbox」「管理者」の3タブだけ。入口の選択画面は無い。
  *
  * 送信者／受信者を分けない理由（仕様書 0.4）:
  * 入口で立場を選ばせると、開くこと自体が意思表示になる。
  * 「私はこれから告発します」という構えを要求することになり、
  * 小規模組織では利用の事実そのものが推測材料になる。
- * 全員が同じ画面を使い、書くことも受け取ることも同じ場所で行う。
+ * 3タブは送信者・受信者の二択ではなく操作の切り替えであり、
+ * 全員が同じ画面から、書くことも受け取ることも見ることもできる。
+ *
+ * 人物セレクタは「受け取りbox」タブの中にある（Inbox.tsx）。
+ * 選んだ人物は受け取りboxの表示だけでなく、「送る」タブの送信者にも使われる（meId を共有）。
  */
-type Mode = "user" | "admin";
-
-type Tab = "write" | "inbox";
+type Tab = "compose" | "inbox" | "admin";
 
 export default function App() {
   // 認証は実装しない。人物セレクタで代用する。
-  const [mode, setMode] = useState<Mode | null>(null);
-  const [tab, setTab] = useState<Tab>("write");
+  const [tab, setTab] = useState<Tab>("compose");
   const [meId, setMeId] = useState("u3");
   const [nonce, setNonce] = useState(0);
   const [stub, setStub] = useState(false);
@@ -41,8 +42,8 @@ export default function App() {
   }, [meId]);
 
   useEffect(() => {
-    if (mode === "user") void refreshInbox();
-  }, [mode, refreshInbox, nonce]);
+    void refreshInbox();
+  }, [refreshInbox, nonce]);
 
   const reset = async () => {
     await resetAction();
@@ -50,82 +51,6 @@ export default function App() {
   };
 
   const bump = () => setNonce((n) => n + 1);
-
-  if (!mode) {
-    return (
-      <div className="shell">
-        <div className="wrap" style={{ paddingBlock: "5rem 3rem" }}>
-          <h1 className="title">言いにくいことを、届ける</h1>
-          <p className="eyebrow" style={{ marginTop: "0.4rem" }}>
-            社内フィードバック（デモ）
-          </p>
-
-          <p className="lede" style={{ marginTop: "2.5rem", maxWidth: "34rem" }}>
-            職場で気になったことを、相手に匿名で伝えるためのツールです。
-            誰が書いたかは、相手にも人事にも表示されません。
-          </p>
-
-          <div style={{ marginTop: "2.5rem", display: "grid", gap: "0.75rem" }}>
-            <button onClick={() => setMode("user")} className="card-choice">
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "1rem",
-                }}
-              >
-                <span style={{ display: "flex", alignItems: "center", gap: "0.9rem" }}>
-                  <span className="chip" aria-hidden>
-                    利用
-                  </span>
-                  <span>
-                    <span style={{ fontSize: "0.98rem", fontWeight: 700 }}>利用者として使う</span>
-                    <span className="lede" style={{ display: "block", fontSize: "0.83rem" }}>
-                      書くことも、届いたものを読むことも、同じ画面でできます
-                    </span>
-                  </span>
-                </span>
-                <span aria-hidden style={{ color: "var(--brand)", fontSize: "1.1rem", lineHeight: 1 }}>
-                  →
-                </span>
-              </span>
-            </button>
-
-            <button onClick={() => setMode("admin")} className="card-choice">
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "1rem",
-                }}
-              >
-                <span style={{ display: "flex", alignItems: "center", gap: "0.9rem" }}>
-                  <span className="chip" aria-hidden>
-                    管理
-                  </span>
-                  <span>
-                    <span style={{ fontSize: "0.98rem", fontWeight: 700 }}>管理者として見る</span>
-                    <span className="lede" style={{ display: "block", fontSize: "0.83rem" }}>
-                      配信状況と、部署ごとの状態を見る
-                    </span>
-                  </span>
-                </span>
-                <span aria-hidden style={{ color: "var(--brand)", fontSize: "1.1rem", lineHeight: 1 }}>
-                  →
-                </span>
-              </span>
-            </button>
-          </div>
-
-          <p className="fineprint" style={{ marginTop: "2.5rem" }}>
-            デモのため認証はありません。本番では社内アカウントで認証し、利用者はこの選択なしに自分の画面へ入ります。
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="shell">
@@ -145,56 +70,37 @@ export default function App() {
             <h1 className="title" style={{ fontSize: "1.05rem" }}>
               言いにくいことを、届ける
             </h1>
-            <p className="eyebrow">
-              {mode === "admin" ? "管理者として表示しています" : `${me.name} として表示しています`}
-            </p>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
-            {mode === "user" && (
-              <select
-                className="field"
-                style={{ width: "auto" }}
-                aria-label="表示する人物"
-                value={meId}
-                onChange={(e) => setMeId(e.target.value)}
-              >
-                {USERS.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}（{u.title}）
-                  </option>
-                ))}
-              </select>
-            )}
-            <button className="link-quiet" onClick={() => setMode(null)}>
-              {mode === "admin" ? "利用者に戻る" : "管理者画面へ"}
-            </button>
+            <p className="eyebrow">{me.name} として表示しています</p>
           </div>
         </div>
       </header>
 
-      {mode === "user" && (
-        <nav className="tabbar">
-          <div className="wrap" style={{ display: "flex", gap: "0.25rem" }}>
-            <button
-              className={`tab ${tab === "write" ? "tab--on" : ""}`}
-              onClick={() => setTab("write")}
-            >
-              書く
-            </button>
-            <button
-              className={`tab ${tab === "inbox" ? "tab--on" : ""}`}
-              onClick={() => {
-                setTab("inbox");
-                void refreshInbox();
-              }}
-            >
-              届いたもの
-              {inboxCount > 0 && <span className="tab-count">{inboxCount}</span>}
-            </button>
-          </div>
-        </nav>
-      )}
+      <nav className="tabbar">
+        <div className="wrap" style={{ display: "flex", gap: "0.25rem" }}>
+          <button
+            className={`tab ${tab === "compose" ? "tab--on" : ""}`}
+            onClick={() => setTab("compose")}
+          >
+            送る
+          </button>
+          <button
+            className={`tab ${tab === "inbox" ? "tab--on" : ""}`}
+            onClick={() => {
+              setTab("inbox");
+              void refreshInbox();
+            }}
+          >
+            受け取りbox
+            {inboxCount > 0 && <span className="tab-count">{inboxCount}</span>}
+          </button>
+          <button
+            className={`tab ${tab === "admin" ? "tab--on" : ""}`}
+            onClick={() => setTab("admin")}
+          >
+            管理者
+          </button>
+        </div>
+      </nav>
 
       <main className="wrap" style={{ paddingBlock: "2.25rem 1rem", flex: 1 }}>
         {stub && (
@@ -206,13 +112,17 @@ export default function App() {
           </div>
         )}
 
-        {mode === "user" && tab === "write" && (
-          <Compose me={me} key={`w${meId}${nonce}`} />
+        {tab === "compose" && <Compose me={me} key={`w${meId}${nonce}`} />}
+        {tab === "inbox" && (
+          <Inbox
+            me={me}
+            users={USERS}
+            onChangeMe={setMeId}
+            onChanged={refreshInbox}
+            key={`i${nonce}`}
+          />
         )}
-        {mode === "user" && tab === "inbox" && (
-          <Inbox me={me} key={`i${meId}${nonce}`} onChanged={refreshInbox} />
-        )}
-        {mode === "admin" && <Admin key={`a${nonce}`} onChanged={bump} />}
+        {tab === "admin" && <Admin key={`a${nonce}`} onChanged={bump} />}
       </main>
 
       <footer className="wrap" style={{ paddingBlock: "1.5rem 2.5rem" }}>

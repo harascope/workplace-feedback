@@ -14,25 +14,25 @@ export const pendingStat = (page: Page) =>
 export const deptDetail = (page: Page, dept: string) =>
   page.getByText(dept, { exact: true }).locator("xpath=..").getByRole("paragraph");
 
-/** 入口の画面から利用者として入る */
+/** 「送る」タブを開く */
 export async function chooseUser(page: Page) {
-  await page.getByRole("button", { name: /^利用者として使う/ }).click();
-  await expect(page.getByRole("button", { name: "書く", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "送る", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "気になったこと", exact: true })).toBeVisible();
 }
 
-/** 入口の画面から管理者として入る */
+/** 「管理者」タブを開く */
 export async function chooseAdmin(page: Page) {
-  await page.getByRole("button", { name: /^管理者として見る/ }).click();
+  await page.getByRole("button", { name: "管理者", exact: true }).click();
   await expect(pendingStat(page)).toBeVisible();
 }
 
-/** 読み込み直して利用者画面を開く。画面の状態（完了画面など）は捨てられる */
+/** 読み込み直して「送る」タブを開く。画面の状態（完了画面など）は捨てられる */
 export async function openUser(page: Page) {
   await page.goto("/");
   await chooseUser(page);
 }
 
-/** 読み込み直して管理者画面を開く。表示は最新のストアの内容になる */
+/** 読み込み直して「管理者」タブを開く。表示は最新のストアの内容になる */
 export async function openAdmin(page: Page) {
   await page.goto("/");
   await chooseAdmin(page);
@@ -74,9 +74,9 @@ export async function deliver(page: Page) {
   await expect(pendingStat(page)).toHaveText("0件 未配信");
 }
 
-/** 利用者画面で表示する人物を切り替え、「届いたもの」を開く */
+/** 「受け取りbox」タブを開き、中の人物カードで表示する人物を切り替える */
 export async function openInboxAs(page: Page, label: string) {
-  await page.getByRole("combobox", { name: "表示する人物", exact: true }).selectOption({ label });
-  // 件数バッジが付くと名前が「届いたもの2」のように変わるので、先頭一致で探す
-  await page.getByRole("button", { name: /^届いたもの/ }).click();
+  // 件数バッジが付くと名前が「受け取りbox2」のように変わるので、先頭一致で探す
+  await page.getByRole("button", { name: /^受け取りbox/ }).click();
+  await page.getByRole("button", { name: label, exact: true }).click();
 }

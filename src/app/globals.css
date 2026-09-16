@@ -21,8 +21,6 @@
   --ink: #16202a;
   --sub: #4c5866;
   --faint: #7c8895;
-  --on-brand: #eaf3f1;
-  --on-brand-faint: #a9c7c2;
 
   /* 主色（深い青緑） */
   --brand: #14615c;
@@ -122,24 +120,24 @@
   padding-inline: 20px;
 }
 
-/* 上部の帯。主色を面で使い、下に影を落として本文より手前に置く */
+/* 上部の帯。主色は面で使わず、上端の線とタブの下線というアクセントだけに残し、
+   下のタブバーから本文まで地続きの白い面として見せる。
+   濃いベタ塗り＋ドロップシャドウだと、白地・ヘアラインのタブバーとの間に
+   段差ができて古い見た目になるため。境界線は下の .tabbar 側が持つ */
 .topbar {
-  background:
-    linear-gradient(180deg, var(--brand) 0%, var(--brand-deep) 100%);
-  color: var(--on-brand);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.12) inset,
-    0 10px 24px -14px rgba(9, 51, 48, 0.75);
+  background: var(--surface);
+  color: var(--ink);
+  border-top: 3px solid var(--brand);
   position: relative;
   z-index: 2;
 }
 
 .topbar .title {
-  color: #ffffff;
+  color: var(--ink);
 }
 
 .topbar .eyebrow {
-  color: var(--on-brand-faint);
+  color: var(--faint);
 }
 
 /* 見出し ------------------------------------------------------------------ */
@@ -227,6 +225,13 @@
 .card-choice:active {
   transform: translateY(0);
   box-shadow: var(--e1), var(--sheen);
+}
+
+/* 受け取りboxの「誰として見るか」で、選ばれている人物を示す */
+.card-choice--on {
+  border-color: var(--brand-line);
+  background: linear-gradient(180deg, var(--surface-tint) 0%, #ffffff 100%);
+  box-shadow: var(--e3), var(--sheen);
 }
 
 /* ロール選択の丸い印。主色のグラデで凸に見せる */
@@ -362,18 +367,14 @@
   color: var(--brand);
 }
 
-/* 帯の上に置くリンクは、地が濃いので色を変える */
-.topbar .link-quiet {
-  color: var(--on-brand-faint);
-}
-.topbar .link-quiet:hover {
-  color: #fff;
-}
-
 /* 入力 -------------------------------------------------------------------- */
 .field {
   width: 100%;
   background: #fff;
+  /* 文字色と配色方式を明示する。select は inherit 任せにすると、OS がダークのとき
+     ネイティブの選択リストが暗い地に暗い文字で描かれて読めなくなる */
+  color: var(--ink);
+  color-scheme: light;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   padding: 0.6rem 0.8rem;
@@ -431,7 +432,7 @@
 }
 
 /* タブ ------------------------------------------------------------------- */
-/* 「書く」と「届いたもの」を同じ画面に置く。入口で立場を選ばせない（仕様書 0.4）。 */
+/* 「送る」「受け取りbox」「管理者」の3タブを常に並べる。入口で立場を選ばせない（仕様書 0.4）。 */
 .tabbar {
   background: var(--surface);
   border-bottom: 1px solid var(--line);

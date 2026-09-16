@@ -14,20 +14,21 @@ function fail(e: unknown, fallback: string): { ok: false; error: string } {
   return { ok: false, error: e instanceof api.ApiError ? e.message : fallback };
 }
 
-export async function analyzeAction(meId: string, body: string): Promise<Result<Analysis>> {
+/** try/catch → Result<T> の定型を1箇所にまとめる。エラー文言は fail() 任せ（挙動は変えない） */
+async function run<T>(fn: () => Promise<T>, fallback: string): Promise<Result<T>> {
   try {
-    return { ok: true, data: await api.analyze(meId, body) };
+    return { ok: true, data: await fn() };
   } catch (e) {
-    return fail(e, "解析に失敗しました。もう一度お試しください。");
+    return fail(e, fallback);
   }
 }
 
+export async function analyzeAction(meId: string, body: string): Promise<Result<Analysis>> {
+  return run(() => api.analyze(meId, body), "解析に失敗しました。もう一度お試しください。");
+}
+
 export async function blurAction(text: string): Promise<Result<string>> {
-  try {
-    return { ok: true, data: await api.blur(text) };
-  } catch (e) {
-    return fail(e, "書き直しに失敗しました。");
-  }
+  return run(() => api.blur(text), "書き直しに失敗しました。");
 }
 
 export async function sendAction(input: {
@@ -51,12 +52,10 @@ export async function sendAction(input: {
 
 /** 送信の取り消し。配信後は受信者の手元にあるので消さない。 */
 export async function cancelAction(authorId: string, id: string): Promise<Result<null>> {
-  try {
+  return run(async () => {
     await api.cancelReport(id, authorId);
-    return { ok: true, data: null };
-  } catch (e) {
-    return fail(e, "取り消しに失敗しました。");
-  }
+    return null;
+  }, "取り消しに失敗しました。");
 }
 
 /**
@@ -68,37 +67,25 @@ export async function escalateAction(input: {
   rawBody: string;
   severityReason: string;
 }): Promise<Result<null>> {
-  try {
+  return run(async () => {
     await api.createEscalation(input);
-    return { ok: true, data: null };
-  } catch (e) {
-    return fail(e, "引き継ぎに失敗しました。");
-  }
+    return null;
+  }, "引き継ぎに失敗しました。");
 }
 
 export async function inboxAction(meId: string): Promise<Result<InboxItem[]>> {
-  try {
-    return { ok: true, data: await api.getInbox(meId) };
-  } catch (e) {
-    return fail(e, "受信箱の取得に失敗しました。");
-  }
+  return run(() => api.getInbox(meId), "受信箱の取得に失敗しました。");
 }
 
 export async function respondAction(id: string, kind: "ack" | "dispute"): Promise<Result<null>> {
-  try {
+  return run(async () => {
     await api.respond(id, kind);
-    return { ok: true, data: null };
-  } catch (e) {
-    return fail(e, "応答の送信に失敗しました。");
-  }
+    return null;
+  }, "応答の送信に失敗しました。");
 }
 
 export async function adminAction(): Promise<Result<AdminView>> {
-  try {
-    return { ok: true, data: await api.getAdmin() };
-  } catch (e) {
-    return fail(e, "管理者情報の取得に失敗しました。");
-  }
+  return run(() => api.getAdmin(), "管理者情報の取得に失敗しました。");
 }
 
 /**
@@ -106,20 +93,14 @@ export async function adminAction(): Promise<Result<AdminView>> {
  * 受信者向けの文面はこの時点で api 側が生成する。
  */
 export async function deliverAction(): Promise<Result<AdminView>> {
-  try {
-    return { ok: true, data: await api.deliver() };
-  } catch (e) {
-    return fail(e, "配信に失敗しました。");
-  }
+  return run(() => api.deliver(), "配信に失敗しました。");
 }
 
 export async function resetAction(): Promise<Result<null>> {
-  try {
+  return run(async () => {
     await api.resetDemo();
-    return { ok: true, data: null };
-  } catch (e) {
-    return fail(e, "初期化に失敗しました。");
-  }
+    return null;
+  }, "初期化に失敗しました。");
 }
 
 /** スタブ動作中かどうか。画面に明示するために使う。 */

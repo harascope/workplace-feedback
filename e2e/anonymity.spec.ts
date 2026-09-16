@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { chooseAdmin, chooseUser, deliver, isServerActionRequest, openUser, resetDemo, sendFeedback } from "./helpers";
 
-const REPORT_ID = /r[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+// ID は Postgres 側の uuid4() 由来で、旧実装にあった "r" 接頭辞は付かない
+const REPORT_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
 const BODY = "佐藤部長に客先で発言を遮られた";
 
 test.beforeEach(async ({ page }) => {
@@ -35,17 +36,15 @@ test("宛先の画面に届く応答に送信者の情報が無く、ID に時�
   // 送信者は鈴木 花子（u3）
   await sendFeedback(page, BODY);
 
-  await page.getByRole("button", { name: "管理者画面へ", exact: true }).click();
   await chooseAdmin(page);
   await deliver(page);
 
-  await page.getByRole("button", { name: "利用者に戻る", exact: true }).click();
   await chooseUser(page);
 
   watchingRecipient = true;
-  await page.getByRole("combobox", { name: "表示する人物", exact: true }).selectOption({ label: "佐藤 健一（部長）" });
+  await page.getByRole("button", { name: /^受け取りbox/ }).click();
+  await page.getByRole("button", { name: "佐藤 健一（部長）", exact: true }).click();
   await expect(page.getByText("佐藤 健一 として表示しています", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: /^届いたもの/ }).click();
   const sent = page.getByRole("article").filter({ hasText: BODY });
   await sent.getByRole("button", { name: "理解した", exact: true }).click();
   await expect(sent.getByText("「理解した」と回答済み", { exact: true })).toBeVisible();
@@ -60,6 +59,7 @@ test("宛先の画面に届く応答に送信者の情報が無く、ID に時�
   }
 
   expect(all.some((t) => REPORT_ID.test(t))).toBe(true);
-  // 時刻を ID に入れると、受信者に送信時刻が伝わりまとめ配信の意味がなくなる
-  for (const text of all) expect(text).not.toMatch(/r\d{13}/);
+  // 時刻を ID に入れると、受信者に送信時刻が伝わりまとめ配信の意味がなくなる。
+  // 接頭辞に依らず、13桁の数字（ミリ秒タイムスタンプ相当）が ID として出ないことを見る
+  for (const text of all) expect(text).not.toMatch(/\b\d{13}\b/);
 });
