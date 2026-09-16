@@ -12,7 +12,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, ValidationError
 
-MODEL = "gemini-3.1-flash-lite"
+from app.config import settings
 
 _client: genai.Client | None = None
 
@@ -66,7 +66,7 @@ async def call_structured[T: BaseModel](
         )
 
         res = await _get_client().aio.models.generate_content(
-            model=MODEL,
+            model=settings.gemini_model,
             contents=content,
             config=types.GenerateContentConfig(
                 # JSON で返させる。それでも崩れることはあるので extract_json と再試行は残す

@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 import app.ai.client as client_module
 from app.ai.client import call_structured, extract_json
+from app.config import settings
 
 
 class _Dummy(BaseModel):
@@ -65,3 +66,12 @@ class TestCallStructured:
 
         # 初回 + 再試行2回 = 合計3回
         assert generate.call_count == 3
+
+    async def test_uses_gemini_model_from_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(settings, "gemini_model", "gemini-test-model")
+        generate = AsyncMock(return_value=SimpleNamespace(text='{"value": 1}'))
+        monkeypatch.setattr(client_module, "_get_client", lambda: _fake_client(generate))
+
+        await call_structured("prompt", _Dummy)
+
+        assert generate.call_args.kwargs["model"] == "gemini-test-model"

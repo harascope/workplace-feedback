@@ -34,16 +34,28 @@ async def _purge_once() -> None:
         )
 
 
+async def _purge_once_safely() -> None:
+    """失敗しても呼び出し元（起動処理・ループ）を止めない _purge_once。
+
+    マイグレーション未適用の DB に繋いだ直後の起動時など、保持期限の掃除自体が
+    本質でない場面でサービスが上がらなくなるのを避ける。本文・author_id・鍵は出さない
+    """
+    try:
+        await _purge_once()
+    except Exception:
+        logger.exception("保持期限のパージに失敗しました")
+
+
 async def _purge_loop() -> None:
     while True:
         await asyncio.sleep(_PURGE_INTERVAL_SECONDS)
-        await _purge_once()
+        await _purge_once_safely()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     make_engine(settings.database_url)
-    await _purge_once()
+    await _purge_once_safely()
     task = asyncio.create_task(_purge_loop())
     try:
         yield

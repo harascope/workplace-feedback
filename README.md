@@ -44,6 +44,9 @@ docker compose up
 
 http://localhost:3000
 
+api の起動時に `alembic upgrade head` が自動で当たる（`docker-compose.yml` の command）ので、
+マイグレーションを手動で叩く必要はない。
+
 ホストにポートを出すのは web だけ。api と db は web と同じ Docker ネットワーク内からしか触れない。
 `src/`・`backend/app/` はホストとコンテナ間でマウントされているので、ファイルを編集すれば
 そのままホットリロードされる（web は Next.js の dev サーバー、api は `uvicorn --reload`）。

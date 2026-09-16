@@ -53,7 +53,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # 起動のたびに alembic upgrade head を当ててから uvicorn を上げる。
+    # deploy/deploy.sh は本番用に別途明示的に当てる設計のままなので、ここでの追加は開発/CI 限定
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   db:
     image: postgres:17-alpine
