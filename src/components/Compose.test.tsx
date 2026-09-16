@@ -44,7 +44,7 @@ async function writeAndAnalyze(body: string, result: Analysis) {
 async function sendOnce() {
   vi.mocked(sendAction).mockResolvedValue({ ok: true, data: { id: "r-test" } });
   const user = await writeAndAnalyze("会議で山田さんに発言を遮られた", analysis());
-  await user.click(await screen.findByRole("button", { name: "送る" }));
+  await user.click(await screen.findByRole("button", { name: "この内容を送る" }));
   await screen.findByText("受け付けました");
   return user;
 }
@@ -116,7 +116,7 @@ describe("レベル3", () => {
     await writeAndAnalyze("上司に殴られた", LEVEL3);
 
     expect(await screen.findByText("このツールでは扱えません")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "送る" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "この内容を送る" })).not.toBeInTheDocument();
   });
 
   it.each([

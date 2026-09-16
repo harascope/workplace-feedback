@@ -97,7 +97,14 @@ export default function Compose({ me }: { me: User }) {
             次回の配信は月曜です。すぐには届きません。送信直後に届くと、直前の出来事から誰が書いたか推測されてしまうためです。
             {/* 失敗は配信済みのときだけなので、取り消せる案内は消す */}
             {!err && (
-              <p style={{ marginTop: "0.6rem", color: "var(--sub)" }}>配信前であれば、この画面から取り消せます。</p>
+              <>
+                <p style={{ marginTop: "0.6rem", color: "var(--sub)" }}>配信前であれば、この画面から取り消せます。</p>
+                {/* sentId は state なので、タブを切り替えた時点で取り消す手段が消える。
+                    「配信までならいつでも」と読まれないよう、有効範囲をその場で言い切る */}
+                <p style={{ marginTop: "0.3rem", color: "var(--warn)" }}>
+                  ただし、取り消せるのはこの画面にいる間だけです。タブを切り替えるか読み込み直すと、取り消せなくなります。
+                </p>
+              </>
             )}
           </Notice>
         )}
@@ -183,9 +190,13 @@ export default function Compose({ me }: { me: User }) {
 
   return (
     <div>
-      <p className="lede" style={{ marginBottom: "1.25rem", maxWidth: "36rem" }}>
+      <p className="lede" style={{ marginBottom: "0.5rem", maxWidth: "36rem" }}>
         職場で気になったことを、そのまま書いてください。どうしてほしいかまで書く必要はありません。
         誰に届くかは、書いたあとで選べます。
+      </p>
+      {/* 一番ためらうのは書く前。匿名の約束は送信ボタンの直前ではなく、入力欄の上に置く（仕様書 1.2） */}
+      <p className="lede" style={{ marginBottom: "1.25rem", color: "var(--brand-deep)" }}>
+        誰が送ったかは、相手にも人事にも表示されません。
       </p>
 
       <textarea
@@ -200,6 +211,8 @@ export default function Compose({ me }: { me: User }) {
         <Btn onClick={analyze} disabled={!body.trim() || busy}>
           {busy ? "確認しています…" : "内容を確認する"}
         </Btn>
+        {/* 押せない理由を書く。薄くなるだけだと、何を待たれているのか分からない */}
+        {!body.trim() && <span className="fineprint">気になったことを書くと押せます</span>}
         {analysis && (
           <button className="link-quiet" onClick={reset}>
             書き直す
@@ -227,17 +240,22 @@ export default function Compose({ me }: { me: User }) {
           {hrNotice ? (
             <p style={{ marginTop: "0.9rem" }}>{hrNotice}</p>
           ) : (
-            <>
-              <p className="fineprint" style={{ marginTop: "0.9rem" }}>
-                あなたが望めば、書いた内容を実名で人事へ引き継げます。引き継がない限り、どこにも保存されません。
-              </p>
-              <div style={{ marginTop: "0.9rem" }}>
-                <Btn variant="ghost" onClick={escalate} disabled={busy}>
-                  {busy ? "引き継いでいます…" : "人事へ引き継ぐ"}
-                </Btn>
-              </div>
-            </>
+            <p className="fineprint" style={{ marginTop: "0.9rem" }}>
+              あなたが望めば、書いた内容を実名で人事へ引き継げます。引き継がない限り、どこにも保存されません。
+            </p>
           )}
+          {/* 引き継がずに抜ける出口を、赤枠の中にも置く（仕様書 2.4）。
+              既存の出口と同じく書く画面に戻すだけで、新しい状態は増やさない */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem", marginTop: "0.9rem" }}>
+            {!hrNotice && (
+              <Btn variant="ghost" onClick={escalate} disabled={busy}>
+                {busy ? "引き継いでいます…" : "人事へ引き継ぐ"}
+              </Btn>
+            )}
+            <Btn variant="ghost" onClick={reset} disabled={busy}>
+              {hrNotice ? "別の内容を書く" : "いまは引き継がない"}
+            </Btn>
+          </div>
         </Notice>
       )}
 
@@ -266,6 +284,15 @@ export default function Compose({ me }: { me: User }) {
               </Field>
             </div>
           </Panel>
+
+          {/* レベル2は送信を止めないが、報復リスクが比較的高いことを警告する（仕様書 3.1）。
+              レベル1では出さない */}
+          {analysis.severity === 2 && (
+            <Notice tone="warn" title="報復のリスクが比較的高い内容です">
+              <p>{analysis.severityReason}</p>
+              <p style={{ marginTop: "0.6rem" }}>送るかどうかは、あなたが決められます。</p>
+            </Notice>
+          )}
 
           {/* 欠落の促し。1回だけ。具体例も選択肢も出さない。条件にはしない */}
           {!prompted && (!hasAction || missingContext) && (
@@ -340,17 +367,25 @@ export default function Compose({ me }: { me: User }) {
               </Panel>
 
               {powerBlock && target && (
-                <Notice tone="warn" title="この相手には自動送信をおすすめしません">
-                  {target.title}
-                  への匿名フィードバックは、報復のリスクが高くなります。この設定では自動送信が既定でオフになっていますが、送ることはできます。
+                /* いま何が起きているかだけを書く。「今オフなのか、押していいのか」で止まらせない（仕様書 3.4） */
+                <Notice tone="warn" title="この相手には、自動で送らない設定です">
+                  <p>
+                    {target.title}への匿名フィードバックは、報復のリスクが高くなります。そのため、この相手あては自動で送らない設定になっています。
+                  </p>
+                  <p style={{ marginTop: "0.6rem" }}>
+                    送信が止められているわけではありません。送るなら、下の「この内容を送る」を押してください。
+                  </p>
                 </Notice>
               )}
 
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.9rem" }}>
+                {/* タブの「送る」と同名にしない。同じ画面に同じ名前の操作が2つあると取り違える */}
                 <Btn onClick={send} disabled={!targetId || busy}>
-                  {busy ? "送っています…" : "送る"}
+                  {busy ? "送っています…" : "この内容を送る"}
                 </Btn>
-                <span className="fineprint">誰が送ったかは、相手にも人事にも表示されません</span>
+                <span className="fineprint">
+                  {targetId ? "押すと、あなたの名前を伏せたまま相手に届きます" : "宛先を選ぶと押せます"}
+                </span>
               </div>
             </div>
           )}

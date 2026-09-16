@@ -71,6 +71,8 @@ export default function App() {
               言いにくいことを、届ける
             </h1>
             <p className="eyebrow">{me.name} として表示しています</p>
+            {/* 他人の名前が出ている理由が、受け取りboxを開くまで分からない */}
+            <p className="fineprint">デモ用に社員を切り替えて試せます（受け取りboxで変更）</p>
           </div>
         </div>
       </header>

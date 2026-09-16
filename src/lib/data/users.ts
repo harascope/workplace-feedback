@@ -81,8 +81,7 @@ export function routeFor(target: User): Route {
       autoSendOff: true,
       bypassHR: false,
       preferExternal: true,
-      notice:
-        "役員への匿名フィードバックは、報復のリスクが高くなります。この設定では自動送信が既定でオフになっていますが、送ることはできます。社外の窓口もあわせて案内します。",
+      notice: `${target.title}への匿名フィードバックは、報復のリスクが高くなります。そのため、この相手あては自動で送らない設定になっています。`,
     };
   }
   if (target.power === "manager") {
@@ -90,8 +89,7 @@ export function routeFor(target: User): Route {
       autoSendOff: true,
       bypassHR: false,
       preferExternal: false,
-      notice:
-        "直属の上司にあたる相手への匿名フィードバックは、報復のリスクが高くなります。この設定では自動送信が既定でオフになっていますが、送ることはできます。",
+      notice: `${target.title}への匿名フィードバックは、報復のリスクが高くなります。そのため、この相手あては自動で送らない設定になっています。`,
     };
   }
   return { autoSendOff: false, bypassHR: false, preferExternal: false, notice: null };

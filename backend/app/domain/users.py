@@ -110,9 +110,8 @@ def route_for(target: User) -> Route:
             bypass_hr=False,
             prefer_external=True,
             notice=(
-                "役員への匿名フィードバックは、報復のリスクが高くなります。"
-                "この設定では自動送信が既定でオフになっていますが、送ることはできます。"
-                "社外の窓口もあわせて案内します。"
+                f"{target.title}への匿名フィードバックは、報復のリスクが高くなります。"
+                "そのため、この相手あては自動で送らない設定になっています。"
             ),
         )
     if target.power == "manager":
@@ -121,8 +120,8 @@ def route_for(target: User) -> Route:
             bypass_hr=False,
             prefer_external=False,
             notice=(
-                "直属の上司にあたる相手への匿名フィードバックは、報復のリスクが高くなります。"
-                "この設定では自動送信が既定でオフになっていますが、送ることはできます。"
+                f"{target.title}への匿名フィードバックは、報復のリスクが高くなります。"
+                "そのため、この相手あては自動で送らない設定になっています。"
             ),
         )
     return Route(auto_send_off=False, bypass_hr=False, prefer_external=False, notice=None)
