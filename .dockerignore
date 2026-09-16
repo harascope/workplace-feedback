@@ -5,3 +5,10 @@ out
 .env
 .env.local
 *.tsbuildinfo
+# テストの成果物。e2e/ と *.test.* は型チェックの対象なので除外しない
+test-results
+playwright-report
+blob-report
+coverage
+.github
+deploy

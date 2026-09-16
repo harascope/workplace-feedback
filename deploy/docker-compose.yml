@@ -1,0 +1,36 @@
+# gpa-prod VM の /opt/workplace-feedback/ に置く（deploy/deploy.sh が転送する）。
+# TAG は同じディレクトリの .env から読む（deploy.sh が書く）。
+# 起動は必ず `docker compose -p workplace-feedback up -d`。
+# プロジェクト名を省くとディレクトリ名から決まり、相乗りしている他のアプリと衝突する。
+services:
+  feedback:
+    image: workplace-feedback:${TAG}
+    restart: unless-stopped
+    # ホストにポートを出さない。外部へは cloudflared から feedback:3000 として渡す
+    expose:
+      - "3000"
+    networks:
+      - gpa_default
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    # イメージに curl は無いので node の fetch で確かめる
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        # 引用符で囲む。`? 0 : 1` の ": " があると YAML がマッピングとして読んでしまう
+        - "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  gpa_default:
+    external: true

@@ -151,3 +151,57 @@ npm run test:e2e
 
 GitHub Actions で push と pull request のたびに、型チェック・ユニット・E2E を実行する。
 API キーは使わない（スタブで動く）。
+
+## デプロイ
+
+自宅ラボの VM（gpa-prod、`ubuntu@192.168.0.220`）に相乗りさせ、Cloudflare Tunnel 経由で
+`https://feedback.fullweak.com` に出す。
+
+### 構成
+
+- `next.config.mjs` の `output: "standalone"` で、依存を同梱した `.next/standalone` を作る
+- `Dockerfile`（node:24-slim のマルチステージ）の runner 段には standalone と `.next/static` だけを置き、
+  `USER node` で `node server.js` を動かす
+- `deploy/docker-compose.yml` を VM の `/opt/workplace-feedback/` に置く。ホストにポートは出さず、
+  `gpa_default` ネットワーク内の `feedback:3000` として cloudflared から参照する
+- イメージはローカルでビルドして `docker save | ssh | docker load` で送る。VM のメモリでは
+  `next build` が落ちる恐れがあるため、VM 上ではビルドしない
+
+### 更新（初回も2回目以降も同じ）
+
+```bash
+./deploy/deploy.sh
+```
+
+作業ツリーがクリーンであることを確かめ、短い sha をタグにしてビルド・転送・起動し、
+healthy を待ってから古いイメージを片付ける（今の版と1つ前を残す）。
+
+### 初回だけの作業
+
+1. VM の `/opt/gpa/cloudflared.yml` をバックアップし、catch-all（`http_status:404`）の直前に足す。
+
+   ```yaml
+   - hostname: feedback.fullweak.com
+     service: http://feedback:3000
+   ```
+
+   `docker restart gpa-cloudflared-1` で反映する。再起動の数秒間は、同じトンネルの他のホストも
+   つながらなくなる。
+
+2. DNS を登録する。証明書がこちら側にしか無いので、VM ではなく WSL から実行する。
+
+   ```bash
+   cloudflared tunnel route dns b4ccefb9-cd76-4153-86d7-597b60705ec9 feedback.fullweak.com
+   ```
+
+### ロールバック
+
+- 前の版に戻す: VM の `/opt/workplace-feedback/.env` の `TAG` を1つ前の sha に書き換えて
+  `docker compose -p workplace-feedback up -d`
+- 止める: `ssh ubuntu@192.168.0.220 'cd /opt/workplace-feedback && docker compose -p workplace-feedback down'`
+
+### API キーを入れない
+
+本番に `ANTHROPIC_API_KEY` は設定せず、スタブで動かす。認証なしで公開するので、キーを入れると
+第三者の操作がそのまま課金につながる。キーを入れるなら、先に公開範囲を絞ること（Cloudflare Access など）。
+コンテナを再起動するとデータは消える（インメモリのため、仕様どおり）。
