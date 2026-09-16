@@ -49,7 +49,9 @@ ssh "${VM}" "cd ${REMOTE_DIR} && docker compose -p ${PROJECT} run --rm api alemb
   die "マイグレーションに失敗した"
 
 echo "==> 起動する"
-ssh "${VM}" "cd ${REMOTE_DIR} && docker compose -p ${PROJECT} up -d" || die "docker compose up に失敗した"
+# --remove-orphans を付ける。旧構成（単体コンテナ）が同じプロジェクト名で残っていると up -d では消えず、
+# 新しい3サービスと同居して gpa_default 上の feedback:3000 を奪い合うため
+ssh "${VM}" "cd ${REMOTE_DIR} && docker compose -p ${PROJECT} up -d --remove-orphans" || die "docker compose up に失敗した"
 
 # 5. healthy になるまで待つ
 echo "==> healthy になるまで待つ"

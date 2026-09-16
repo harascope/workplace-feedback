@@ -250,6 +250,56 @@ web・api を起動し、web が healthy になるのを待って、古いイメ
    cloudflared tunnel route dns b4ccefb9-cd76-4153-86d7-597b60705ec9 feedback.fullweak.com
    ```
 
+### 初回切り替え時の退避と巻き戻し
+
+いま VM で動いているのは旧構成（web の単体コンテナ、イメージ名 `workplace-feedback`）。
+3サービス構成を初めて反映するときだけ、以下を先にやっておく。2回目以降は不要。
+
+1. 切り替え前に現状を控える。
+
+   ```bash
+   ssh ubuntu@192.168.0.220
+   docker ps --format '{{.Names}}\t{{.Image}}\t{{.Status}}'   # 旧コンテナ名とイメージ:tag
+   docker image ls workplace-feedback                         # 旧イメージに残っている tag
+   docker inspect workplace-feedback-feedback-1 > ~/feedback-old.json
+   ```
+
+   旧コンテナ名は compose 起動なので `workplace-feedback-feedback-1` になっているはず。
+   実際の名前は `docker ps` の出力で確かめる。`docker inspect` の結果は環境変数と
+   ネットワークの控えになるので、`deploy.sh` が触らない場所（ホームなど）に置く。
+   `/opt/workplace-feedback/` の中には置かない。
+
+2. 旧イメージを消さない。`deploy/deploy.sh` のイメージ世代管理（`deploy/deploy.sh:81-82`）が
+   対象にするのは `workplace-feedback-web` と `workplace-feedback-api`（`deploy/deploy.sh:9-10`）だけで、
+   リポジトリ名の一致しない旧イメージ `workplace-feedback` は自動では消えない。
+   手で `docker rmi` しないこと。巻き戻し先がなくなる。
+
+3. 新構成が失敗したら、新スタックを落として旧イメージで単体コンテナを起動し直す。
+
+   ```bash
+   ssh ubuntu@192.168.0.220
+   cd /opt/workplace-feedback
+   docker compose -p workplace-feedback down          # -v は絶対に付けない（4 参照）
+   docker run -d --name feedback --restart unless-stopped \
+     --network gpa_default \
+     --security-opt no-new-privileges:true \
+     --env-file /opt/workplace-feedback/secrets.env \
+     workplace-feedback:<控えた旧 TAG>
+   ```
+
+   cloudflared ingress は `feedback:3000` を引くので、コンテナ名は `feedback`、
+   ネットワークは `gpa_default` でないと届かない。`secrets.env` を置いていなければ
+   `--env-file` の行ごと落とす（スタブのまま起動する）。
+
+   この単体コンテナは compose 管理外なので、`deploy.sh` の `--remove-orphans` では消えない。
+   新構成を再挑戦する前に `docker rm -f feedback` で自分で消すこと。残したまま流すと
+   `gpa_default` 上で `feedback` の名前が新しい web コンテナとぶつかる。
+
+4. `down -v` を使わない。db は名前付きボリューム `db_data`
+   （`deploy/docker-compose.yml:77-78`・`:99-100`）に載っていて、`docker compose down -v` は
+   これごと消す＝申告・引き継ぎのデータが消える。巻き戻しでも再挑戦でも使うのは `down` だけ。
+   なお旧構成に db は無い（`db_data` は使われないまま残る）。
+
 ### ロールバック
 
 - 前の版に戻す: VM の `/opt/workplace-feedback/.env` の `TAG` を1つ前の sha に書き換えて
