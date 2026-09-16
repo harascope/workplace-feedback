@@ -19,6 +19,8 @@ export default function Compose({ me }: { me: User }) {
   const [body, setBody] = useState("");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [targetId, setTargetId] = useState("");
+  // 宛先を自分で選んだか。選んでいれば、解析結果による自動選択で上書きしない
+  const [picked, setPicked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [prompted, setPrompted] = useState(false);
@@ -30,6 +32,12 @@ export default function Compose({ me }: { me: User }) {
 
   const candidates = USERS.filter((u) => u.id !== me.id);
 
+  /** 宛先の選択。「まだ決めない」に戻したら、また本文からの自動選択に委ねる */
+  const choose = (id: string) => {
+    setTargetId(id);
+    setPicked(id !== "");
+  };
+
   const analyze = async () => {
     setBusy(true);
     setErr("");
@@ -38,7 +46,8 @@ export default function Compose({ me }: { me: User }) {
       setAnalysis(r.data);
       setBlurAccepted(false);
       setPrompted(false);
-      if (r.data.targetHint) {
+      // 自分で選んでいればその宛先を優先する。未選択のときだけ本文から補う
+      if (!picked && r.data.targetHint) {
         const hit = userFromHint(r.data.targetHint, candidates);
         if (hit) setTargetId(hit.id);
       }
@@ -65,6 +74,7 @@ export default function Compose({ me }: { me: User }) {
     setBody("");
     setAnalysis(null);
     setTargetId("");
+    setPicked(false);
     setPrompted(false);
     setBlurAccepted(false);
     setErr("");
@@ -192,7 +202,7 @@ export default function Compose({ me }: { me: User }) {
     <div>
       <p className="lede" style={{ marginBottom: "0.5rem", maxWidth: "36rem" }}>
         職場で気になったことを、そのまま書いてください。どうしてほしいかまで書く必要はありません。
-        誰に届くかは、書いたあとで選べます。
+        誰に届けるかは、いま選んでも、書いたあとで選んでもかまいません。
       </p>
       {/* 一番ためらうのは書く前。匿名の約束は送信ボタンの直前ではなく、入力欄の上に置く（仕様書 1.2） */}
       <p className="lede" style={{ marginBottom: "1.25rem", color: "var(--brand-deep)" }}>
@@ -206,6 +216,26 @@ export default function Compose({ me }: { me: User }) {
         value={body}
         onChange={(e) => setBody(e.target.value)}
       />
+
+      {/* 宛先は書いている最中から見える位置に置くが、任意のままにする（仕様書 2.2）。
+          必須にすると、書く前に「誰かを名指しする」構えを要求することになる。
+          確認画面のセレクタとは名前を変える。同じ名前の操作が2つあると取り違える */}
+      <div style={{ marginTop: "1rem", maxWidth: "26rem" }}>
+        <label className="label" htmlFor="target-early">
+          誰に届けるか（任意）
+        </label>
+        <select id="target-early" className="field" value={targetId} onChange={(e) => choose(e.target.value)}>
+          <option value="">まだ決めない（本文から自動で選ぶ）</option>
+          {candidates.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}（{u.dept}・{u.title}）
+            </option>
+          ))}
+        </select>
+        <p className="fineprint" style={{ marginTop: "0.35rem" }}>
+          選ばなくても書けます。そのままなら、本文に出てくる名前から選ばれます。
+        </p>
+      </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "0.9rem", margin: "1rem 0 2rem" }}>
         <Btn onClick={analyze} disabled={!body.trim() || busy}>
@@ -354,7 +384,7 @@ export default function Compose({ me }: { me: User }) {
                     id="target"
                     className="field"
                     value={targetId}
-                    onChange={(e) => setTargetId(e.target.value)}
+                    onChange={(e) => choose(e.target.value)}
                   >
                     <option value="">選んでください</option>
                     {candidates.map((u) => (

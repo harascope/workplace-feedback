@@ -91,6 +91,61 @@ describe("送信後の完了画面", () => {
   });
 });
 
+describe("書く画面の宛先", () => {
+  const early = () => screen.getByRole("combobox", { name: "誰に届けるか（任意）" });
+  const onConfirm = () => screen.findByRole("combobox", { name: "誰に届けますか" });
+
+  it("既定は未選択で、選ばなくても確認まで進める", async () => {
+    await writeAndAnalyze("会議で山田さんに発言を遮られた", analysis());
+
+    // 未選択のまま押せたことは、ここまで来られた時点で示されている
+    expect(await onConfirm()).toHaveValue("u1");
+    expect(early()).toHaveValue("u1");
+  });
+
+  it("必須にしない。本文が空でも宛先セレクタは出ていて、未選択のまま押せる状態になる", async () => {
+    vi.mocked(analyzeAction).mockResolvedValue({ ok: true, data: analysis() });
+    const user = userEvent.setup();
+    render(<Compose me={me} />);
+
+    expect(early()).toHaveValue("");
+    expect(screen.getByRole("button", { name: "内容を確認する" })).toBeDisabled();
+
+    // 宛先ではなく本文だけが、押せるかどうかを決める
+    await user.type(screen.getByRole("textbox", { name: "気になったこと" }), "会議で発言を遮られた");
+    expect(screen.getByRole("button", { name: "内容を確認する" })).toBeEnabled();
+  });
+
+  it("書く画面で選んだ宛先は、本文からの自動選択に上書きされず確認画面へ引き継がれる", async () => {
+    vi.mocked(analyzeAction).mockResolvedValue({ ok: true, data: analysis() });
+    const user = userEvent.setup();
+    render(<Compose me={me} />);
+
+    await user.selectOptions(early(), "u4");
+    await user.type(screen.getByRole("textbox", { name: "気になったこと" }), "会議で山田さんに発言を遮られた");
+    await user.click(screen.getByRole("button", { name: "内容を確認する" }));
+
+    // targetHint は「山田 太郎」だが、自分で選んだ高橋 みどりが残る
+    expect(await onConfirm()).toHaveValue("u4");
+    expect(early()).toHaveValue("u4");
+  });
+
+  it("「まだ決めない」に戻すと、また本文から自動で選ばれる", async () => {
+    vi.mocked(analyzeAction).mockResolvedValue({ ok: true, data: analysis() });
+    const user = userEvent.setup();
+    render(<Compose me={me} />);
+
+    await user.selectOptions(early(), "u4");
+    await user.selectOptions(early(), "");
+    expect(early()).toHaveValue("");
+
+    await user.type(screen.getByRole("textbox", { name: "気になったこと" }), "会議で山田さんに発言を遮られた");
+    await user.click(screen.getByRole("button", { name: "内容を確認する" }));
+
+    expect(await onConfirm()).toHaveValue("u1");
+  });
+});
+
 describe("レベル3", () => {
   it("「人事へ引き継ぐ」を押すと完了画面に切り替わり、書く画面には戻らない", async () => {
     vi.mocked(escalateAction).mockResolvedValue({ ok: true, data: null });
