@@ -200,38 +200,111 @@
   border-color: var(--brand-line);
 }
 
-/* 入口のロール選択 */
-.card-choice {
-  display: block;
-  width: 100%;
+/* 受け取りboxの「誰として見るか」。
+   名簿6人を縦積みの大カードにすると、それだけで画面が埋まって選んだ人の中身が
+   折り返しの下に押し出される。押しても視界の中で何も変わらないので、切り替わったことが
+   伝わらない。横に並ぶ小さなボタンにして、中身をすぐ下に置く。
+   1人1行（名前・役職・件数を縦に積まない）にして、44rem の本文幅では3列＝2行に収める。
+   400px 幅では1列に落ちるが、1行ぶんの高さしか使わない。
+   列数は minmax で決まる。3列にも4列にも見えるよう最小幅をいじると、
+   4列では「高橋 みどり（メンバー）」が入らず役職が折り返すので、11.5rem から下げない */
+.person-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+  gap: 0.4rem;
+}
+
+.person-pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
   text-align: left;
   background: linear-gradient(180deg, #ffffff 0%, #fafcfb 100%);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--e2), var(--sheen);
-  padding: 1.125rem 1.25rem;
-  transition:
-    transform 0.16s ease,
-    box-shadow 0.22s ease,
-    border-color 0.22s ease;
-}
-
-.card-choice:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--e3), var(--sheen);
-  border-color: var(--brand-line);
-}
-
-.card-choice:active {
-  transform: translateY(0);
+  border-radius: var(--radius-sm);
   box-shadow: var(--e1), var(--sheen);
+  padding: 0.35rem 0.6rem;
+  transition:
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
 }
 
-/* 受け取りboxの「誰として見るか」で、選ばれている人物を示す */
-.card-choice--on {
+.person-pick:hover {
   border-color: var(--brand-line);
-  background: linear-gradient(180deg, var(--surface-tint) 0%, #ffffff 100%);
-  box-shadow: var(--e3), var(--sheen);
+  box-shadow: var(--e2), var(--sheen);
+}
+
+/* 表示中の人物。淡い縁取りの差では切り替わったことが伝わらないので、
+   面ごと主色で塗って残りの5人と別物に見せる。印（✓）も足す */
+.person-pick--on {
+  background: linear-gradient(180deg, var(--brand-lift) 0%, var(--brand-deep) 100%);
+  border-color: var(--brand-deep);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 4px 12px -4px rgba(9, 51, 48, 0.5);
+}
+
+/* 名前と役職は同じ行に置く。縦に積むと6人で画面を使い切る */
+.person-pick__who {
+  display: flex;
+  align-items: baseline;
+  gap: 0.1rem;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.person-pick__mark {
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-right: 0.15rem;
+}
+
+.person-pick__name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+/* 役職は名前より小さく。同じ行に収める余地をここで作る */
+.person-pick__sub {
+  font-size: 0.7rem;
+  line-height: 1.7;
+  color: var(--faint);
+}
+
+.person-pick--on .person-pick__mark,
+.person-pick--on .person-pick__name,
+.person-pick--on .person-pick__sub {
+  color: #fff;
+}
+
+.person-pick--on .person-pick__sub {
+  opacity: 0.85;
+}
+
+/* 主色で塗った面の上では、主色のバッジは沈んで読めない */
+.person-pick--on .tab-count {
+  background: #fff;
+  color: var(--brand-deep);
+}
+
+/* 受け取りboxの中身の直前に置く見出し。上の帯の「〇〇 として表示しています」は
+   中身から遠いので、中身のすぐ上でも誰あてのものかを言う */
+.inbox-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.6;
+  padding-bottom: 0.6rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--line);
+  /* 人物を選んだ直後にここへスクロールする。上端に貼り付かせない */
+  scroll-margin-top: 0.75rem;
 }
 
 /* ロール選択の丸い印。主色のグラデで凸に見せる */
