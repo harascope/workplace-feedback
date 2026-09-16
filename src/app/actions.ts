@@ -1,37 +1,22 @@
 "use server";
 
-import { analyze as aiAnalyze } from "@/lib/ai/analyze";
-import { blur as aiBlur } from "@/lib/ai/blur";
-import { compose as aiCompose } from "@/lib/ai/compose";
+import * as api from "@/lib/api";
 import type { Analysis, Severity } from "@/lib/ai/schemas";
-import { USERS, userById } from "@/lib/data/users";
-import {
-  addEscalation,
-  addReport,
-  cancelReport,
-  evaluateDepts,
-  listEscalations,
-  listInbox,
-  listPending,
-  markDelivered,
-  pendingCount,
-  resetStore,
-  respond as storeRespond,
-  type DeptEval,
-  type InboxItem,
-} from "@/lib/store";
+import type { AdminView, InboxItem } from "@/lib/api";
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
+export type { AdminView };
+
+/** api の detail をそのまま画面へ出す（docs/api.md）。それ以外の失敗はフォールバック文言にする */
 function fail(e: unknown, fallback: string): { ok: false; error: string } {
   console.error(e);
-  return { ok: false, error: fallback };
+  return { ok: false, error: e instanceof api.ApiError ? e.message : fallback };
 }
 
 export async function analyzeAction(meId: string, body: string): Promise<Result<Analysis>> {
   try {
-    const names = USERS.filter((u) => u.id !== meId).map((u) => u.name);
-    return { ok: true, data: await aiAnalyze({ body, candidateNames: names }) };
+    return { ok: true, data: await api.analyze(meId, body) };
   } catch (e) {
     return fail(e, "解析に失敗しました。もう一度お試しください。");
   }
@@ -39,7 +24,7 @@ export async function analyzeAction(meId: string, body: string): Promise<Result<
 
 export async function blurAction(text: string): Promise<Result<string>> {
   try {
-    return { ok: true, data: await aiBlur(text) };
+    return { ok: true, data: await api.blur(text) };
   } catch (e) {
     return fail(e, "書き直しに失敗しました。");
   }
@@ -53,13 +38,12 @@ export async function sendAction(input: {
   rawBody: string;
   hasContext: boolean;
 }): Promise<Result<{ id: string }>> {
-  // レベル3はこのツールで扱わない。UI で止めているが、サーバー側でも拒否する。
+  // レベル3はこのツールで扱わない。UI で止めているが、api 側でも拒否する（422）。
   if (input.severity === 3) {
     return { ok: false, error: "この内容はこのツールでは送信できません。" };
   }
   try {
-    const { id } = addReport(input);
-    return { ok: true, data: { id } };
+    return { ok: true, data: await api.createReport(input) };
   } catch (e) {
     return fail(e, "送信に失敗しました。");
   }
@@ -67,10 +51,12 @@ export async function sendAction(input: {
 
 /** 送信の取り消し。配信後は受信者の手元にあるので消さない。 */
 export async function cancelAction(authorId: string, id: string): Promise<Result<null>> {
-  if (!cancelReport(id, authorId)) {
-    return { ok: false, error: "すでに配信されたため取り消せません。" };
+  try {
+    await api.cancelReport(id, authorId);
+    return { ok: true, data: null };
+  } catch (e) {
+    return fail(e, "取り消しに失敗しました。");
   }
-  return { ok: true, data: null };
 }
 
 /**
@@ -83,7 +69,7 @@ export async function escalateAction(input: {
   severityReason: string;
 }): Promise<Result<null>> {
   try {
-    addEscalation(input);
+    await api.createEscalation(input);
     return { ok: true, data: null };
   } catch (e) {
     return fail(e, "引き継ぎに失敗しました。");
@@ -91,73 +77,57 @@ export async function escalateAction(input: {
 }
 
 export async function inboxAction(meId: string): Promise<Result<InboxItem[]>> {
-  return { ok: true, data: listInbox(meId) };
+  try {
+    return { ok: true, data: await api.getInbox(meId) };
+  } catch (e) {
+    return fail(e, "受信箱の取得に失敗しました。");
+  }
 }
 
 export async function respondAction(id: string, kind: "ack" | "dispute"): Promise<Result<null>> {
-  storeRespond(id, kind);
-  return { ok: true, data: null };
-}
-
-export type AdminView = {
-  pending: number;
-  depts: DeptEval[];
-  /** 本人が実名での引き継ぎに同意したものなので、氏名を出してよい */
-  escalations: {
-    id: string;
-    authorName: string;
-    rawBody: string;
-    severityReason: string;
-    createdAt: number;
-  }[];
-};
-
-function adminView(): AdminView {
-  return {
-    pending: pendingCount(),
-    depts: evaluateDepts(),
-    escalations: listEscalations().map(({ id, authorId, rawBody, severityReason, createdAt }) => ({
-      id,
-      authorName: userById(authorId)?.name ?? authorId,
-      rawBody,
-      severityReason,
-      createdAt,
-    })),
-  };
+  try {
+    await api.respond(id, kind);
+    return { ok: true, data: null };
+  } catch (e) {
+    return fail(e, "応答の送信に失敗しました。");
+  }
 }
 
 export async function adminAction(): Promise<Result<AdminView>> {
-  return { ok: true, data: adminView() };
+  try {
+    return { ok: true, data: await api.getAdmin() };
+  } catch (e) {
+    return fail(e, "管理者情報の取得に失敗しました。");
+  }
 }
 
 /**
  * まとめ配信。本番は週1のバッチだが、デモでは管理者が手動で起動する。
- * 受信者向けの文面はこの時点で生成する。
+ * 受信者向けの文面はこの時点で api 側が生成する。
  */
 export async function deliverAction(): Promise<Result<AdminView>> {
   try {
-    const batch = listPending();
-    for (const r of batch) {
-      let composed = null;
-      try {
-        composed = await aiCompose(r.body);
-      } catch (e) {
-        console.error(e);
-      }
-      markDelivered(r.id, composed);
-    }
-    return { ok: true, data: adminView() };
+    return { ok: true, data: await api.deliver() };
   } catch (e) {
     return fail(e, "配信に失敗しました。");
   }
 }
 
 export async function resetAction(): Promise<Result<null>> {
-  resetStore();
-  return { ok: true, data: null };
+  try {
+    await api.resetDemo();
+    return { ok: true, data: null };
+  } catch (e) {
+    return fail(e, "初期化に失敗しました。");
+  }
 }
 
 /** スタブ動作中かどうか。画面に明示するために使う。 */
 export async function stubModeAction(): Promise<boolean> {
-  return !process.env.GEMINI_API_KEY;
+  try {
+    return (await api.getMeta()).stub;
+  } catch (e) {
+    console.error(e);
+    return false;
+  }
 }

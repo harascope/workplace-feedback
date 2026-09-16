@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { inboxAction, respondAction } from "@/app/actions";
 import type { User } from "@/lib/data/users";
-import type { InboxItem } from "@/lib/store";
+import type { InboxItem } from "@/lib/api";
 import { Btn, Field, Notice } from "./ui";
 
 /**
