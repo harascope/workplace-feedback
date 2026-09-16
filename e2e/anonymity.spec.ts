@@ -1,5 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { chooseAdmin, chooseUser, deliver, isServerActionRequest, openUser, resetDemo, sendFeedback } from "./helpers";
+import {
+  chooseAdmin,
+  chooseUser,
+  deliver,
+  isServerActionRequest,
+  openUser,
+  resetDemo,
+  screen,
+  sendFeedback,
+  tabbar,
+} from "./helpers";
 
 // ID は Postgres 側の uuid4() 由来で、旧実装にあった "r" 接頭辞は付かない
 const REPORT_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
@@ -42,8 +52,8 @@ test("宛先の画面に届く応答に送信者の情報が無く、ID に時�
   await chooseUser(page);
 
   watchingRecipient = true;
-  await page.getByRole("button", { name: /^受け取りbox/ }).click();
-  await page.getByRole("button", { name: "佐藤 健一（部長）", exact: true }).click();
+  await tabbar(page).getByRole("button", { name: /^受け取りbox/ }).click();
+  await screen(page).getByRole("button", { name: "佐藤 健一（部長）", exact: true }).click();
   await expect(page.getByText("佐藤 健一 として表示しています", { exact: true })).toBeVisible();
   const sent = page.getByRole("article").filter({ hasText: BODY });
   await sent.getByRole("button", { name: "理解した", exact: true }).click();

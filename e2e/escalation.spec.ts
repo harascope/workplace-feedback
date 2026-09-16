@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { analyze, openAdmin, openUser, pendingStat, resetDemo } from "./helpers";
+import { analyze, openAdmin, openUser, pendingStat, resetDemo, screen } from "./helpers";
 
 const ESCALATE = { name: "人事へ引き継ぐ", exact: true } as const;
 const HR_NOTICE = /^この相手は人事担当です。/;
@@ -14,14 +14,14 @@ test("レベル3で人事へ引き継ぐと専用の完了画面になり、管�
   await openUser(page);
   await analyze(page, body);
   await expect(page.getByText("このツールでは扱えません", { exact: true })).toBeVisible();
-  await page.getByRole("button", ESCALATE).click();
+  await screen(page).getByRole("button", ESCALATE).click();
 
   await expect(page.getByText("人事担当に、あなたの名前とともに届きました。", { exact: true })).toBeVisible();
   // 書く画面に戻ると同じ内容を二重に引き継げてしまう
-  await expect(page.getByRole("textbox", { name: "気になったこと", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "内容を確認する", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", ESCALATE)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "別の内容を書く", exact: true })).toBeVisible();
+  await expect(screen(page).getByRole("textbox", { name: "気になったこと", exact: true })).toHaveCount(0);
+  await expect(screen(page).getByRole("button", { name: "内容を確認する", exact: true })).toHaveCount(0);
+  await expect(screen(page).getByRole("button", ESCALATE)).toHaveCount(0);
+  await expect(screen(page).getByRole("button", { name: "別の内容を書く", exact: true })).toBeVisible();
 
   await openAdmin(page);
   await expect(page.getByRole("heading", { name: "人事への引き継ぎ（1 件）", exact: true })).toBeVisible();
@@ -40,10 +40,10 @@ test("人事担当の名前が書かれたレベル3では引き継ぎボタン�
   await analyze(page, "佐藤部長と伊藤さんに殴られた");
   await expect(page.getByText("このツールでは扱えません", { exact: true })).toBeVisible();
   await expect(page.getByText(HR_NOTICE)).toBeVisible();
-  await expect(page.getByRole("button", ESCALATE)).toHaveCount(0);
+  await expect(screen(page).getByRole("button", ESCALATE)).toHaveCount(0);
 
-  await page.getByRole("button", { name: "書き直す", exact: true }).click();
+  await screen(page).getByRole("button", { name: "書き直す", exact: true }).click();
   await analyze(page, "上司に殴られた");
-  await expect(page.getByRole("button", ESCALATE)).toBeVisible();
+  await expect(screen(page).getByRole("button", ESCALATE)).toBeVisible();
   await expect(page.getByText(HR_NOTICE)).toHaveCount(0);
 });
