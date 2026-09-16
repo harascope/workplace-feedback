@@ -7,12 +7,22 @@
 # 3層構成にしてもこの名前は変えない（README「デプロイ」参照。ingress 側の変更は不要）。
 # api と db はこのプロジェクト専用の内部ネットワーク（default）だけに置き、
 # gpa_default（他アプリと相乗りのネットワーク）には出さない。
+#
+# 【本番だけ api を wf-api という別名で引く理由】
+# web は cloudflared から `feedback:3000` として引かれるので gpa_default から外せない。
+# その gpa_default には別プロジェクトの `api` というサービスが既にいるため、
+# 2つのネットワークに属する web の中で `api` がそちら（8000 で待ち受けていない別コンテナ）に
+# 解決され、web → api が ECONNREFUSED で一度も通らなかった。
+# そこで api に default 上の一意なエイリアス `wf-api` を与え、web はその名前で引く。
+# 開発用 docker-compose.yml には gpa_default が無く衝突しないので、あちらは `api` のまま。
 services:
   feedback:
     image: workplace-feedback-web:${TAG}
     restart: unless-stopped
     environment:
-      - API_BASE_URL=http://api:8000
+      # `api` ではなく `wf-api`。gpa_default 側の別プロジェクトの `api` に解決されてしまうため
+      # （冒頭のコメント参照）。開発用 compose とはここだけ値が違う
+      - API_BASE_URL=http://wf-api:8000
     # ホストにポートを出さない。外部へは cloudflared から feedback:3000 として渡す
     expose:
       - "3000"
@@ -52,9 +62,13 @@ services:
     env_file:
       - path: ./secrets.env
         required: false
-    # ホストにもgpa_defaultにも出さない。web からだけ届く
+    # ホストにもgpa_defaultにも出さない。web からだけ届く。
+    # default 上でだけ通じる別名 wf-api を付ける。gpa_default には出さないので、
+    # この名前が相乗り中の他アプリから引かれることはない
     networks:
-      - default
+      default:
+        aliases:
+          - wf-api
     security_opt:
       - no-new-privileges:true
     deploy:

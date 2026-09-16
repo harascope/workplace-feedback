@@ -3,7 +3,7 @@
 Next.js（web）と FastAPI（api）の間の契約。**この文書が唯一の拠り所**で、実装側が勝手に変えない。
 api は外部公開しない。ブラウザは web にだけ触れ、web の Server Actions が api を呼ぶ。
 
-- ベース URL: `API_BASE_URL`（既定 `http://api:8000`）
+- ベース URL: `API_BASE_URL`（既定 `http://api:8000`。本番だけ `http://wf-api:8000`）
 - 形式: JSON、**snake_case**
 - 認証: 無し（内部ネットワークのみ）
 - 文字コード: UTF-8
@@ -215,5 +215,9 @@ api は web コンテナからしか到達しない（外部公開していな�
 | `GEMINI_MODEL` | api | `gemini-3.1-flash-lite` |
 | `RETENTION_DAYS` | api | `30` |
 | `API_BASE_URL` | web | `http://api:8000` |
+
+`API_BASE_URL` は本番だけ `http://wf-api:8000`。本番の web は cloudflared 用に共有ネットワーク
+`gpa_default` にも属し、そこにいる別プロジェクトの `api` に名前が奪われるので、`deploy/docker-compose.yml`
+が api に一意なエイリアス `wf-api` を与えている。開発・CI は衝突しないので `api` のまま。
 
 鍵は api だけが持つ。web には渡さない。

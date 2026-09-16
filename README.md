@@ -224,6 +224,9 @@ GitHub Actions（`.github/workflows/test.yml`）に2ジョブある。
   `feedback`。cloudflared ingress がこの名前を参照しているので変えていない）だけがホストにポートを出さず
   `gpa_default` ネットワークにも参加し、`feedback:3000` として cloudflared から見える。
   api と db はこのプロジェクト専用の内部ネットワークだけに置き、他の相乗りアプリからは触れない
+- web が `gpa_default` にも属する都合で、コンテナ名 `api` は同ネットワーク上の別プロジェクトのものに
+  解決されてしまう。そこで本番だけ api に一意なエイリアス `wf-api` を与え、web の `API_BASE_URL` を
+  `http://wf-api:8000` にしている（開発用 `docker-compose.yml` は衝突しないので `http://api:8000` のまま）
 - db は名前付きボリュームを持つので、コンテナを再作成してもデータは残る。
   保持期限（`RETENTION_DAYS`、既定30日）を過ぎた申告・引き継ぎは api が起動時と1日1回で自動削除する
 - リソース上限: web 256M / api 256M / db 192M。`no-new-privileges` を全サービスに付与
