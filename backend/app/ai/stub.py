@@ -21,6 +21,9 @@ OBSERVABLE = [
     "遮", "割り込", "言わ", "言っ", "送っ", "送ら", "無視", "返さ", "返って", "割り当て",
     "怒鳴", "呼ば", "頼ま", "書か", "指示", "聞か", "笑わ", "denied",
 ]
+# 話し方・接し方の様態。その場に居合わせた人が見聞きできるので行動として扱う。
+# EVALUATIVE より先に見る（「態度が冷たい」は様態、「態度が悪い」は評価）
+MANNER = ["口調", "言い方", "話し方", "きつ", "きびし", "厳し", "威圧", "高圧", "冷た", "そっけな"]
 # 書き手の評価・相手の内面。相手が認知できないので行動として扱わない
 EVALUATIVE = ["態度", "感じ", "やる気", "嫌", "見下", "馬鹿にさ", "冷た", "雰囲気"]
 
@@ -54,7 +57,9 @@ def _actions_of(body: str) -> list[Action]:
         Action(
             description=s,
             observable=(
-                has(s, OBSERVABLE) or (not has(s, EVALUATIVE) and bool(_ACTION_RE.search(s)))
+                has(s, OBSERVABLE)
+                or has(s, MANNER)
+                or (not has(s, EVALUATIVE) and bool(_ACTION_RE.search(s)))
             ),
         )
         for s in source
