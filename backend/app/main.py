@@ -24,14 +24,27 @@ _PURGE_INTERVAL_SECONDS = 60 * 60 * 24
 
 
 async def _purge_once() -> None:
+    """reports と escalations を個別に try/except し、片方が失敗してももう片方は実行する。
+
+    escalations は実名・原文を持つため、reports だけ消えた事実が黙って埋もれると気づけない。
+    ログは件数と失敗の事実だけ。本文・author_id・鍵は出さない。
+    """
     async for session in get_session():
-        deleted_reports = await reports_repo.purge_old(session, settings.retention_days)
-        deleted_escalations = await escalations_repo.purge_old(session, settings.retention_days)
-        logger.info(
-            "保持期限切れの申告を %d 件、引き継ぎを %d 件パージしました",
-            deleted_reports,
-            deleted_escalations,
-        )
+        try:
+            deleted_reports = await reports_repo.purge_old(session, settings.retention_days)
+        except Exception:
+            await session.rollback()
+            logger.exception("保持期限切れの申告のパージに失敗しました")
+        else:
+            logger.info("保持期限切れの申告を %d 件パージしました", deleted_reports)
+
+        try:
+            deleted_escalations = await escalations_repo.purge_old(session, settings.retention_days)
+        except Exception:
+            await session.rollback()
+            logger.exception("保持期限切れの引き継ぎのパージに失敗しました")
+        else:
+            logger.info("保持期限切れの引き継ぎを %d 件パージしました", deleted_escalations)
 
 
 async def _purge_once_safely() -> None:
