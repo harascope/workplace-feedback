@@ -274,7 +274,7 @@ async def reset(
     await reports_repo.reset_to_seed(session)
 
 
-# 全消し＋24件の書き戻しと重い。E2E は呼ばず、デモで押すのも数回なので低めにする
+# 全消し＋35件の書き戻しと重い。E2E は呼ばず、デモで押すのも数回なので低めにする
 @router.post("/admin/seed-demo", response_model=AdminView)
 @limiter.limit("6/minute")
 async def seed_demo(

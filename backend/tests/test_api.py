@@ -270,9 +270,13 @@ class TestAdminSeedDemo:
         # 開発部は1人部署なので母数下限に満たず、アラートは出さない
         assert depts["開発部"]["below_min_members"] is True
         assert depts["開発部"]["alert"] is False
-        # 管理部は未配信だけなので、集計上は「データなし」（時期ぼかし）
-        assert depts["管理部"]["level"] is None
-        assert depts["管理部"]["label"] == "データなし"
+        # 管理部にも配信済みが届くので「データなし」にはならない（仕様書 6.1 の「データなし」は
+        # 申告ゼロのときの表示）。ただし2人部署なので母数下限に満たず、部署単位では判断しない
+        # （仕様書 6.2）。評価自体は出るがアラートは出さない、が正しい状態
+        assert depts["管理部"]["level"] is not None
+        assert depts["管理部"]["label"] != "データなし"
+        assert depts["管理部"]["below_min_members"] is True
+        assert depts["管理部"]["alert"] is False
 
     async def test_seed_demo_never_exposes_author_ids(
         self, client: httpx.AsyncClient
