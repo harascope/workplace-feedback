@@ -22,8 +22,9 @@ test.beforeEach(async ({ page }) => {
 test("宛先の画面に届く応答に送信者の情報が無く、ID に時刻が入っていない", async ({ page }) => {
   await openUser(page);
 
-  const all: string[] = [];
-  // 管理者画面の応答は引き継ぎの氏名などを正当に含むので、宛先の画面に切り替えた後のものだけを分けて集める
+  // 管理者画面の応答は配信予定の時刻や引き継ぎの氏名を正当に含むので、調べる対象から外す。
+  // 守るべきは「受信者に送信者と送信時期を伝えない」ことなので、
+  // 宛先の画面に切り替えた後の応答だけを集めて、それだけを見る
   const recipient: string[] = [];
   let watchingRecipient = false;
 
@@ -37,7 +38,6 @@ test("宛先の画面に届く応答に送信者の情報が無く、ID に時�
       const body = await res.body();
       // Content-Type（text/x-component）に charset が無いので、自分で UTF-8 として読む
       const text = body.toString("utf8");
-      all.push(text);
       if (inRecipient) recipient.push(text);
       await route.fulfill({ response: res, body });
     },
@@ -68,8 +68,8 @@ test("宛先の画面に届く応答に送信者の情報が無く、ID に時�
     expect(text).not.toContain("鈴木");
   }
 
-  expect(all.some((t) => REPORT_ID.test(t))).toBe(true);
+  expect(recipient.some((t) => REPORT_ID.test(t))).toBe(true);
   // 時刻を ID に入れると、受信者に送信時刻が伝わりまとめ配信の意味がなくなる。
   // 接頭辞に依らず、13桁の数字（ミリ秒タイムスタンプ相当）が ID として出ないことを見る
-  for (const text of all) expect(text).not.toMatch(/\b\d{13}\b/);
+  for (const text of recipient) expect(text).not.toMatch(/\b\d{13}\b/);
 });

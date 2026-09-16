@@ -56,12 +56,12 @@ test("本文に書かれた名前から宛先が自動で選ばれる", async ({
   const target = page.getByRole("combobox", { name: "誰に届けますか", exact: true });
   await expect(target).toHaveValue("u2");
   await expect(target.locator("option:checked")).toHaveText("佐藤 健一（営業部・部長）");
-  await expect(screen(page).getByRole("button", { name: "送る", exact: true })).toBeEnabled();
+  await expect(screen(page).getByRole("button", { name: "この内容を送る", exact: true })).toBeEnabled();
 
   // 名前が無ければ決めつけず、利用者に選ばせる
   await screen(page).getByRole("button", { name: "書き直す", exact: true }).click();
   await analyze(page, "会議で発言を遮られた");
   await expect(page.getByText("相手に届く文面", { exact: true })).toBeVisible();
   await expect(target).toHaveValue("");
-  await expect(screen(page).getByRole("button", { name: "送る", exact: true })).toBeDisabled();
+  await expect(screen(page).getByRole("button", { name: "この内容を送る", exact: true })).toBeDisabled();
 });

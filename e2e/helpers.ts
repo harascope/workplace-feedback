@@ -76,7 +76,7 @@ export async function analyze(page: Page, body: string) {
 /** 宛先が本文から自動で選ばれる文を送り、完了画面が出るまで待つ */
 export async function sendFeedback(page: Page, body: string) {
   await analyze(page, body);
-  const send = screen(page).getByRole("button", { name: "送る", exact: true });
+  const send = screen(page).getByRole("button", { name: "この内容を送る", exact: true });
   await expect(send).toBeEnabled();
   await send.click();
   await expect(page.getByText("受け付けました", { exact: true })).toBeVisible();
