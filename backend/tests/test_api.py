@@ -199,3 +199,26 @@ class TestRateLimit:
 
         assert statuses[:10] == [201] * 10
         assert statuses[10] == 429
+
+    async def test_rate_limit_is_keyed_per_x_client_id_header(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        # X-Client-Id が別なら別枠で数える（web はここに利用者を識別する値を載せる。docs/api.md）
+        payload = {
+            "author_id": "u1",
+            "target_id": "u2",
+            "severity": 1,
+            "body": "…",
+            "raw_body": "…",
+            "has_context": True,
+        }
+        for _ in range(10):
+            r = await client.post("/reports", json=payload, headers={"X-Client-Id": "client-a"})
+            assert r.status_code == 201
+
+        # client-a は使い切ったが client-b は別枠なのでまだ通る
+        r = await client.post("/reports", json=payload, headers={"X-Client-Id": "client-a"})
+        assert r.status_code == 429
+
+        r = await client.post("/reports", json=payload, headers={"X-Client-Id": "client-b"})
+        assert r.status_code == 201

@@ -1,6 +1,7 @@
 import "server-only";
+import { headers } from "next/headers";
 import { z } from "zod";
-import { analysisSchema, composedSchema, severitySchema, type Analysis, type Severity } from "@/lib/ai/schemas";
+import { composedSchema, severitySchema, type Analysis, type Severity } from "@/lib/ai/schemas";
 
 /**
  * FastAPI（api）を呼ぶ薄いクライアント。契約は docs/api.md（唯一の拠り所）。
@@ -10,6 +11,29 @@ import { analysisSchema, composedSchema, severitySchema, type Analysis, type Sev
  */
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://api:8000";
+
+const FALLBACK_CLIENT_ID = "unknown";
+
+/**
+ * ブラウザ側の利用者を識別する値（docs/api.md「レート制限」節）。
+ *
+ * api は web コンテナからしか呼ばれないため、api 側から見た送信元は常に web になる。
+ * api 側でレート制限を利用者単位にできるよう、ここで X-Client-Id ヘッダとして渡す。
+ * Cloudflare 経由なら cf-connecting-ip が最も信頼できるのでそれを優先し、
+ * 無ければ x-forwarded-for（先頭の1件）、どちらも取れなければ固定値にフォールバックする。
+ */
+async function clientId(): Promise<string> {
+  try {
+    const h = await headers();
+    const cfIp = h.get("cf-connecting-ip");
+    if (cfIp) return cfIp.trim();
+    const forwardedFor = h.get("x-forwarded-for");
+    if (forwardedFor) return forwardedFor.split(",")[0]!.trim() || FALLBACK_CLIENT_ID;
+    return FALLBACK_CLIENT_ID;
+  } catch {
+    return FALLBACK_CLIENT_ID;
+  }
+}
 
 /** api からのエラー応答。detail を message にそのまま載せる（docs/api.md: web 側はこの detail をそのまま画面に出す） */
 export class ApiError extends Error {
@@ -34,10 +58,10 @@ async function detailOf(res: Response): Promise<string | undefined> {
   return undefined;
 }
 
-async function call<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
+async function call<T>(path: string, schema: z.ZodType<T, z.ZodTypeDef, unknown>, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: { "Content-Type": "application/json", "X-Client-Id": await clientId(), ...init?.headers },
     cache: "no-store",
   });
 
@@ -58,31 +82,34 @@ export async function getMeta(): Promise<{ stub: boolean }> {
 
 // ---- POST /analyze ----
 
-const analyzeResSchema = z.object({
-  actions: z.array(z.object({ description: z.string(), observable: z.boolean() })),
-  context: z.string().nullable(),
-  target_hint: z.string().nullable(),
-  severity: severitySchema,
-  severity_reason: z.string(),
-  identifiability: z.enum(["low", "medium", "high"]),
-  identifiability_reason: z.string(),
-  organized: z.string(),
-});
+const analyzeResSchema = z
+  .object({
+    actions: z.array(z.object({ description: z.string(), observable: z.boolean() })),
+    context: z.string().nullable(),
+    target_hint: z.string().nullable(),
+    severity: severitySchema,
+    severity_reason: z.string(),
+    identifiability: z.enum(["low", "medium", "high"]),
+    identifiability_reason: z.string(),
+    organized: z.string(),
+  })
+  .transform(
+    (r): Analysis => ({
+      actions: r.actions,
+      context: r.context,
+      targetHint: r.target_hint,
+      severity: r.severity,
+      severityReason: r.severity_reason,
+      identifiability: r.identifiability,
+      identifiabilityReason: r.identifiability_reason,
+      organized: r.organized,
+    }),
+  );
 
 export async function analyze(meId: string, body: string): Promise<Analysis> {
-  const r = await call("/analyze", analyzeResSchema, {
+  return call("/analyze", analyzeResSchema, {
     method: "POST",
     body: JSON.stringify({ me_id: meId, body }),
-  });
-  return analysisSchema.parse({
-    actions: r.actions,
-    context: r.context,
-    targetHint: r.target_hint,
-    severity: r.severity,
-    severityReason: r.severity_reason,
-    identifiability: r.identifiability,
-    identifiabilityReason: r.identifiability_reason,
-    organized: r.organized,
   });
 }
 
@@ -137,18 +164,21 @@ export type InboxItem = {
 };
 
 const inboxResSchema = z.array(
-  z.object({
-    id: z.string(),
-    body: z.string(),
-    has_context: z.boolean(),
-    composed: composedSchema.nullable(),
-    response: z.enum(["ack", "dispute"]).nullable(),
-  }),
+  z
+    .object({
+      id: z.string(),
+      body: z.string(),
+      has_context: z.boolean(),
+      composed: composedSchema.nullable(),
+      response: z.enum(["ack", "dispute"]).nullable(),
+    })
+    .transform(
+      (x): InboxItem => ({ id: x.id, body: x.body, hasContext: x.has_context, composed: x.composed, response: x.response }),
+    ),
 );
 
 export async function getInbox(userId: string): Promise<InboxItem[]> {
-  const r = await call(`/inbox/${encodeURIComponent(userId)}`, inboxResSchema);
-  return r.map((x) => ({ id: x.id, body: x.body, hasContext: x.has_context, composed: x.composed, response: x.response }));
+  return call(`/inbox/${encodeURIComponent(userId)}`, inboxResSchema);
 }
 
 export async function respond(id: string, kind: "ack" | "dispute"): Promise<void> {
@@ -175,40 +205,41 @@ export type AdminView = {
   }[];
 };
 
-const adminResSchema = z.object({
-  pending: z.number(),
-  depts: z.array(z.object({ dept: z.string(), level: z.number().nullable(), label: z.string(), detail: z.string() })),
-  escalations: z.array(
-    z.object({
-      id: z.string(),
-      author_name: z.string(),
-      raw_body: z.string(),
-      severity_reason: z.string(),
-      created_at: z.string(),
+const adminResSchema = z
+  .object({
+    pending: z.number(),
+    depts: z.array(z.object({ dept: z.string(), level: z.number().nullable(), label: z.string(), detail: z.string() })),
+    escalations: z.array(
+      z.object({
+        id: z.string(),
+        author_name: z.string(),
+        raw_body: z.string(),
+        severity_reason: z.string(),
+        created_at: z.string(),
+      }),
+    ),
+  })
+  .transform(
+    (r): AdminView => ({
+      pending: r.pending,
+      depts: r.depts,
+      escalations: r.escalations.map((e) => ({
+        id: e.id,
+        authorName: e.author_name,
+        rawBody: e.raw_body,
+        severityReason: e.severity_reason,
+        // epoch ミリ秒。api は ISO 文字列で返すが、画面側の型（Date.now() 由来）に合わせて変換する
+        createdAt: new Date(e.created_at).getTime(),
+      })),
     }),
-  ),
-});
-
-function mapAdmin(r: z.infer<typeof adminResSchema>): AdminView {
-  return {
-    pending: r.pending,
-    depts: r.depts,
-    escalations: r.escalations.map((e) => ({
-      id: e.id,
-      authorName: e.author_name,
-      rawBody: e.raw_body,
-      severityReason: e.severity_reason,
-      createdAt: new Date(e.created_at).getTime(),
-    })),
-  };
-}
+  );
 
 export async function getAdmin(): Promise<AdminView> {
-  return mapAdmin(await call("/admin", adminResSchema));
+  return call("/admin", adminResSchema);
 }
 
 export async function deliver(): Promise<AdminView> {
-  return mapAdmin(await call("/admin/deliver", adminResSchema, { method: "POST" }));
+  return call("/admin/deliver", adminResSchema, { method: "POST" });
 }
 
 // ---- POST /escalations, POST /admin/reset ----
