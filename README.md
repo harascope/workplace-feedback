@@ -2,16 +2,35 @@
 
 職場での言動に関する不満を、AI を介して匿名で相手に伝える Web アプリ。
 仕様は [docs/spec.md](docs/spec.md)。判断の理由まで書かれているので、実装前に読むこと。
+web ⇄ api の HTTP 契約は [docs/api.md](docs/api.md)。
+
+## 構成
+
+web（Next.js）/ api（FastAPI）/ db（PostgreSQL）の3層。
+
+```
+ブラウザ ──▶ web（Next.js 16 / React 19）──▶ api（FastAPI / Python 3.13）──▶ PostgreSQL 17
+              Server Actions が窓口              Gemini 呼び出しもここ
+```
+
+**api は外部公開しない。** ブラウザは web にしか触れず、web の Server Actions が
+内部ネットワーク経由で api を呼ぶ（CORS 不要、鍵は api だけが持つ）。
+
+| パス | 役割 |
+|---|---|
+| `src/app/actions.ts` | Server Actions。`src/lib/api.ts` 経由で api を呼ぶだけの薄い層 |
+| `src/lib/api.ts` | api への fetch クライアント。応答は zod で検証 |
+| `src/components/` | 画面 |
+| `backend/app/domain/` | 重大度・匿名性・部署評価の規則、名簿 |
+| `backend/app/ai/` | analyze・blur・compose・stub（Gemini 呼び出しとキー無し時の代替） |
+| `backend/app/db/` | SQLAlchemy モデルとリポジトリ。受信箱用のクエリは匿名性のためにここで author_id/raw_body を持たない |
+| `backend/app/api/` | ルーター・レート制限 |
+| `backend/alembic/` | マイグレーション |
 
 ## セットアップ
 
-Docker を使う方法と、ローカルに Node.js を入れる方法のどちらでもよい。
-チームで環境を揃えたいなら Docker を推奨。
-
-### Docker（推奨）
-
-Docker Desktop が動いていればよい。Node のバージョン差やネイティブ依存の
-インストール失敗を気にする必要がない。
+Docker Desktop（または互換の Docker 環境）が動いていればよい。
+Node / Python のバージョン差やネイティブ依存のインストール失敗を気にする必要がない。
 
 ```bash
 cp .env.example .env.local
@@ -25,11 +44,12 @@ docker compose up
 
 http://localhost:3000
 
-ソースはホストとコンテナ間でマウントされているので、ファイルを編集すれば
-そのままホットリロードされる。`node_modules` はコンテナ専用の Docker ボリュームに
-分離してあるので、ホスト側で `npm install` する必要はない。
+ホストにポートを出すのは web だけ。api と db は web と同じ Docker ネットワーク内からしか触れない。
+`src/`・`backend/app/` はホストとコンテナ間でマウントされているので、ファイルを編集すれば
+そのままホットリロードされる（web は Next.js の dev サーバー、api は `uvicorn --reload`）。
+`node_modules` と Python の仮想環境はコンテナ側に閉じているので、ホスト側でのインストールは不要。
 
-依存関係を追加・変更したとき（`package.json` を書き換えたとき）は再ビルドする。
+依存関係を追加・変更したとき（`package.json` や `backend/pyproject.toml` を書き換えたとき）は再ビルドする。
 
 ```bash
 docker compose up --build
@@ -41,48 +61,49 @@ docker compose up --build
 docker compose down
 ```
 
-### ローカルに Node.js を入れる方法
+データを含めて消すとき（db の名前付きボリュームも削除）:
 
-Node.js 22.13 以上が必要（テストに使う Vitest 5 の要件）。
+```bash
+docker compose down -v
+```
+
+### Docker を使わない方法
+
+Node.js 22.13 以上（Vitest 5 の要件）と、Python 3.13 ＋ [uv](https://docs.astral.sh/uv/)、
+それにローカルの PostgreSQL が必要。db は用意できないことが多いので、通常は上の Docker 方式を推奨する。
 
 ```bash
 npm install
+cp .env.example .env.local   # GEMINI_API_KEY は任意。NEXT_PUBLIC_ は付けないこと
+npm run dev                  # http://localhost:3000
 ```
 
 ```bash
-cp .env.example .env.local
+cd backend
+uv sync
+DATABASE_URL=postgresql+asyncpg://<user>:<pass>@localhost:5432/<db> uv run alembic upgrade head
+DATABASE_URL=postgresql+asyncpg://<user>:<pass>@localhost:5432/<db> uv run uvicorn app.main:app --reload
 ```
 
-`.env.local` に Gemini の API キー（`GEMINI_API_KEY`）を入れる。`NEXT_PUBLIC_` は付けないこと。
+## 環境変数
 
-```bash
-npm run dev
-```
+| 名前 | 使う側 | 既定 |
+|---|---|---|
+| `DATABASE_URL` | api | ― （必須。compose では `docker-compose.yml` が渡す） |
+| `GEMINI_API_KEY` | api | 未設定ならスタブ |
+| `GEMINI_MODEL` | api | `gemini-3.1-flash-lite` |
+| `RETENTION_DAYS` | api | `30`（この日数を過ぎた申告・引き継ぎは自動削除） |
+| `API_BASE_URL` | web | `http://api:8000` |
 
-http://localhost:3000
-
-## 構成
-
-| パス | 役割 |
-|---|---|
-| `src/lib/ai/analyze.ts` | 行動・場面・対象者の抽出、重大度判定、特定リスク判定（1 回の呼び出し） |
-| `src/lib/ai/blur.ts` | 特定されにくい表現への書き直し |
-| `src/lib/ai/compose.ts` | 受信者向けフィードバック生成（what / why / how） |
-| `src/lib/ai/schemas.ts` | 出力の zod スキーマ |
-| `src/lib/ai/client.ts` | Gemini 呼び出し（`gemini-3.1-flash-lite`）。スキーマ検証に失敗したら理由を添えて再試行 |
-| `src/lib/store.ts` | インメモリストア。開発サーバー再起動で消える |
-| `src/app/actions.ts` | Server Actions。API キーに触れる唯一の経路 |
-| `src/components/` | 画面 |
-
-AI の 4 関数は UI と DB を知らない。入力を受けて構造化された値を返すだけなので、
-プロンプトのチューニングは UI を触らずに行える。
+鍵は api だけが持つ。web には渡さない（`NEXT_PUBLIC_` を付けないのはもちろん、
+サーバー側の環境変数としても web には置かない）。
 
 ## 実装上の不変条件
 
 仕様書 8 章の原則から来ている。変更するときは理由を確認すること。
 
-- **受信画面に送信者の情報を出さない。** `authorId` は `Report` にしかなく、受信者に渡る
-  `InboxItem` は型として持たない。`listInbox()` は `authorId` を読まずに組み立てる
+- **受信画面に送信者の情報を出さない。** `author_id` と `raw_body` は `backend/app/db/repositories/inbox.py` の
+  クエリに含めない（select しない）。型で隠すだけでなく DB 層で担保する
 - **Server Action の呼び出しログを出さない。** `next.config.mjs` の `logging.serverFunctions: false`。
   引数に `authorId` と本文が含まれ、dev ログから誰が書いたか分かってしまう
 - **AI が促すとき、具体例も選択肢も出さない。** 誘導になり、記憶が汚染される
@@ -92,7 +113,7 @@ AI の 4 関数は UI と DB を知らない。入力を受けて構造化され
 - **即時配信しない。** 週 1 のまとめ配信。デモでは管理者画面の手動配信で代用
 - **申告ゼロの部署は「データなし」。** レベル1（安全）とは区別する
 - **部署評価は配信済みの申告だけで集計する。** 送信直後に数字が動くと、誰が書いたか推測される
-- **人事への引き継ぎは匿名の経路に混ぜない。** `Escalation` は `Report` と別の配列に置き、
+- **人事への引き継ぎは匿名の経路に混ぜない。** `escalations` は `reports` と別テーブルに置き、
   受信箱・配信・部署評価からは読まない
 
 ## 簡易実装
@@ -112,13 +133,12 @@ AI の 4 関数は UI と DB を知らない。入力を受けて構造化され
 - 送信後のフォローアップ（3 日 / 2 週 / 1 ヶ月）と報復検知（3.2）
 - 部署アラート（6.2）
 - 企業設定と、設定変更時の警告・変更履歴（6.3）
-- レート制限（4.2）
-- 認証、永続化
+- 認証
 
 ## API キー無しで動かす（スタブ）
 
-`GEMINI_API_KEY` が未設定のときは、AI 呼び出しが `src/lib/ai/stub.ts` の
-簡易な代替処理に置き換わり、画面上部に「スタブ動作中」と表示される。
+`GEMINI_API_KEY` が未設定のときは、api の AI 呼び出しが `backend/app/ai/stub.py` の
+簡易な代替処理に置き換わり、画面上部に「スタブ動作中」と表示される（`GET /meta` の `stub` を見て判定）。
 UI の分岐（欠落の促し・特定リスク・レベル3停止・権力差・まとめ配信）は
 このままひととおり確認できるが、文面の質は実 API とは別物。
 
@@ -132,6 +152,18 @@ UI の分岐（欠落の促し・特定リスク・レベル3停止・権力差�
 npm test
 ```
 
+### バックエンド（pytest）
+
+```bash
+cd backend
+uv sync
+uv run ruff check .
+uv run pytest
+```
+
+ドメイン規則・匿名性・AI（モック）はここでテストする。DB テストは SQLite（aiosqlite）で完結し、
+実際の PostgreSQL は要らない。
+
 ### E2E（Playwright）
 
 初回だけブラウザを入れる。
@@ -144,13 +176,26 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-本番ビルドを 3200 番ポートで起動し、スタブで動かす。サーバーのメモリ上のデータを
-全テストで共有するので、並列にせず直列で実行する。
+既定では単体の `next start`（3200 番ポート、スタブ）を自動で立てて流す。
+`E2E_BASE_URL` を渡すと、その URL（起動済みの web）に対して流す。
+`docker compose up` で3サービスを起動した状態なら、api を経由した実際の構成で確認できる。
+
+```bash
+docker compose up -d --wait
+E2E_BASE_URL=http://localhost:3000 npm run test:e2e
+```
+
+サーバー側のデータを全テストで共有するので、並列にせず直列で実行する。
 
 ### CI
 
-GitHub Actions で push と pull request のたびに、型チェック・ユニット・E2E を実行する。
-API キーは使わない（スタブで動く）。
+GitHub Actions（`.github/workflows/test.yml`）に2ジョブある。
+
+- `test`: 型チェック・Vitest のあと、`docker compose up --build --wait` で web/api/db を起動し、
+  その web に対して Playwright E2E を流す
+- `backend`: uv で依存を入れ、ruff → pytest。DB テストのために `services: postgres` を用意する
+
+どちらも `GEMINI_API_KEY` は渡さない（api は未設定のままスタブで動く）。
 
 ## デプロイ
 
@@ -159,13 +204,17 @@ API キーは使わない（スタブで動く）。
 
 ### 構成
 
-- `next.config.mjs` の `output: "standalone"` で、依存を同梱した `.next/standalone` を作る
-- `Dockerfile`（node:24-slim のマルチステージ）の runner 段には standalone と `.next/static` だけを置き、
-  `USER node` で `node server.js` を動かす
-- `deploy/docker-compose.yml` を VM の `/opt/workplace-feedback/` に置く。ホストにポートは出さず、
-  `gpa_default` ネットワーク内の `feedback:3000` として cloudflared から参照する
-- イメージはローカルでビルドして `docker save | ssh | docker load` で送る。VM のメモリでは
-  `next build` が落ちる恐れがあるため、VM 上ではビルドしない
+- イメージは2つ。web は `Dockerfile`（node:24-slim、`next.config.mjs` の `output: "standalone"` を動かす）、
+  api は `backend/Dockerfile`（python:3.13-slim、uv で依存を入れて `uvicorn` を非 root で動かす）
+- `deploy/docker-compose.yml` を VM の `/opt/workplace-feedback/` に置く。web（compose 上のサービス名は
+  `feedback`。cloudflared ingress がこの名前を参照しているので変えていない）だけがホストにポートを出さず
+  `gpa_default` ネットワークにも参加し、`feedback:3000` として cloudflared から見える。
+  api と db はこのプロジェクト専用の内部ネットワークだけに置き、他の相乗りアプリからは触れない
+- db は名前付きボリュームを持つので、コンテナを再作成してもデータは残る。
+  保持期限（`RETENTION_DAYS`、既定30日）を過ぎた申告・引き継ぎは api が起動時と1日1回で自動削除する
+- リソース上限: web 256M / api 256M / db 192M。`no-new-privileges` を全サービスに付与
+- イメージはローカルでビルドして `docker save | gzip | ssh | docker load` で送る。VM のメモリでは
+  `next build` や依存解決が落ちる恐れがあるため、VM 上ではビルドしない
 
 ### 更新（初回も2回目以降も同じ）
 
@@ -173,8 +222,9 @@ API キーは使わない（スタブで動く）。
 ./deploy/deploy.sh
 ```
 
-作業ツリーがクリーンであることを確かめ、短い sha をタグにしてビルド・転送・起動し、
-healthy を待ってから古いイメージを片付ける（今の版と1つ前を残す）。
+作業ツリーがクリーンであることを確かめ、短い sha をタグに2つのイメージ（web・api）をビルド・転送する。
+db を起動して healthy を待ち、api イメージで `alembic upgrade head` を当ててから
+web・api を起動し、web が healthy になるのを待って、古いイメージを片付ける（今の版と1つ前を残す）。
 
 ### 初回だけの作業
 
@@ -186,7 +236,8 @@ healthy を待ってから古いイメージを片付ける（今の版と1つ�
    ```
 
    `docker restart gpa-cloudflared-1` で反映する。再起動の数秒間は、同じトンネルの他のホストも
-   つながらなくなる。
+   つながらなくなる。3層構成にしても web のサービス名（`feedback`）とポート（3000）は変えていないので、
+   この ingress 設定自体の変更は不要。
 
 2. DNS を登録する。証明書がこちら側にしか無いので、VM ではなく WSL から実行する。
 
@@ -197,15 +248,21 @@ healthy を待ってから古いイメージを片付ける（今の版と1つ�
 ### ロールバック
 
 - 前の版に戻す: VM の `/opt/workplace-feedback/.env` の `TAG` を1つ前の sha に書き換えて
-  `docker compose -p workplace-feedback up -d`
+  `docker compose -p workplace-feedback up -d`。**マイグレーションは自動では巻き戻らない。**
+  スキーマを追加しただけの変更なら通常は問題にならないが、破壊的なマイグレーションを戻すときは
+  手動で `alembic downgrade` を検討する
 - 止める: `ssh ubuntu@192.168.0.220 'cd /opt/workplace-feedback && docker compose -p workplace-feedback down'`
 
 ### API キー（Gemini）
 
 鍵はイメージに焼かない。VM の `/opt/workplace-feedback/secrets.env` に `GEMINI_API_KEY=...` を置き、
-compose の `env_file`（`required: false`）から実行時に読ませる。置いていなければスタブのまま起動する。
+`deploy/docker-compose.yml` の api サービスが `env_file`（`required: false`）で実行時に読む。
+置いていなければスタブのまま起動する。web には鍵を渡さない。
 `deploy/deploy.sh` は `secrets.env` を作らないし上書きもしない（`.env` に書くのは `TAG` だけ）。
 
 認証なしで公開しているので、鍵を入れた状態では第三者の操作がそのまま課金につながる。
-絞るなら公開範囲を先に制限すること（Cloudflare Access など）。
-コンテナを再起動するとデータは消える（インメモリのため、仕様どおり）。
+乱用対策として `POST /analyze` `/blur` `/reports` `/escalations` に IP 単位のレート制限を入れている
+（`docs/api.md`「レート制限」参照）。絞るならさらに公開範囲を制限すること（Cloudflare Access など）。
+
+データは PostgreSQL の名前付きボリュームに永続化される。コンテナを再起動してもデータは残る
+（以前のインメモリ実装とはここが変わった）。保持期限を過ぎた行は自動で削除される。
