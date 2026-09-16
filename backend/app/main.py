@@ -13,7 +13,8 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.api.limits import limiter
 from app.api.routes import router
 from app.config import settings
-from app.db.repositories.reports import purge_old
+from app.db.repositories import escalations as escalations_repo
+from app.db.repositories import reports as reports_repo
 from app.db.session import get_session, make_engine
 
 logger = logging.getLogger(__name__)
@@ -24,8 +25,13 @@ _PURGE_INTERVAL_SECONDS = 60 * 60 * 24
 
 async def _purge_once() -> None:
     async for session in get_session():
-        deleted = await purge_old(session, settings.retention_days)
-        logger.info("保持期限切れの申告を %d 件パージしました", deleted)
+        deleted_reports = await reports_repo.purge_old(session, settings.retention_days)
+        deleted_escalations = await escalations_repo.purge_old(session, settings.retention_days)
+        logger.info(
+            "保持期限切れの申告を %d 件、引き継ぎを %d 件パージしました",
+            deleted_reports,
+            deleted_escalations,
+        )
 
 
 async def _purge_loop() -> None:

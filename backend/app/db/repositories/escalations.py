@@ -4,9 +4,10 @@
 受信箱・部署評価はこのテーブルを一切読まない（別配列として扱う）。
 """
 
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Escalation
@@ -43,3 +44,15 @@ async def list_escalations(s: AsyncSession) -> list[EscalationView]:
             )
         )
     return views
+
+
+async def purge_old(s: AsyncSession, days: int) -> int:
+    """保持期限を過ぎた引き継ぎを削除する（docs/api.md「保持期限」節）。
+
+    reports.purge_old と同じ形。escalations は author_id・raw_body（実名・原文）を持つため、
+    パージ漏れは個人情報の長期残留に直結する。
+    """
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    result = await s.execute(delete(Escalation).where(Escalation.created_at < cutoff))
+    await s.commit()
+    return result.rowcount
