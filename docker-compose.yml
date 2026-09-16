@@ -1,5 +1,7 @@
+# 開発用。web / api / db の3サービス。本番用は deploy/docker-compose.yml。
+# ホストにポートを出すのは web だけ（3000）。api と db は内部ネットワークのみ。
 services:
-  app:
+  web:
     build:
       context: .
       dockerfile: Dockerfile.dev
@@ -14,15 +16,60 @@ services:
       - next_cache:/app/.next
     environment:
       - NODE_ENV=development
-    # GEMINI_API_KEY はここで渡さない。
-    # 上のボリュームマウントで .env.local がコンテナ内にも見えるので、
-    # Next.js が自分で読み込む（ローカル実行時と同じ挙動）。
-    # ここで空文字を渡すと、実プロセスの環境変数が .env.local より優先され、
-    # キーを入れてもスタブのままになる。
+      - API_BASE_URL=http://api:8000
+    # GEMINI_API_KEY はここでは渡さない。鍵は api だけが持つ（web からは消えた）
+    depends_on:
+      api:
+        condition: service_healthy
     # -H 0.0.0.0 が無いと 127.0.0.1 にしかバインドされず、
     # ホストから localhost:3000 でアクセスできなくなる
     command: npx next dev -H 0.0.0.0
+    # CI の E2E が `docker compose up --wait` で起動完了を待つのに使う（curl は入っていないので node の fetch で）
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      # app/ だけをマウントしてホットリロードを効かせる。alembic や pyproject はイメージのものを使う
+      - ./backend/app:/app/app
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://app:app@db:5432/workplace_feedback
+    # GEMINI_API_KEY はここでは渡さない。.env.local にあれば下の env_file が拾う。
+    # 無ければ未設定のまま起動する（GET /meta が stub: true を返す）
+    env_file:
+      - path: ./.env.local
+        required: false
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=app
+      - POSTGRES_DB=workplace_feedback
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d workplace_feedback"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   node_modules:
   next_cache:
+  db_data:

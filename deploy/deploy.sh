@@ -6,7 +6,8 @@ set -euo pipefail
 VM="${VM:-ubuntu@192.168.0.220}"
 REMOTE_DIR="${REMOTE_DIR:-/opt/workplace-feedback}"
 PROJECT="workplace-feedback"
-IMAGE="workplace-feedback"
+IMAGE_WEB="workplace-feedback-web"
+IMAGE_API="workplace-feedback-api"
 
 cd "$(dirname "$0")/.."
 
@@ -21,11 +22,13 @@ TAG="$(git rev-parse --short HEAD)"
 echo "==> タグ: ${TAG}"
 
 # 2. ローカルでビルドする。VM のメモリでは next build が落ちる恐れがあるため
-echo "==> イメージをビルドする: ${IMAGE}:${TAG}"
-docker build -t "${IMAGE}:${TAG}" . || die "docker build に失敗した"
+echo "==> イメージをビルドする: ${IMAGE_WEB}:${TAG}"
+docker build -t "${IMAGE_WEB}:${TAG}" . || die "docker build (web) に失敗した"
+echo "==> イメージをビルドする: ${IMAGE_API}:${TAG}"
+docker build -t "${IMAGE_API}:${TAG}" ./backend || die "docker build (api) に失敗した"
 
 echo "==> イメージを ${VM} へ送る"
-docker save "${IMAGE}:${TAG}" | gzip | ssh "${VM}" 'gunzip | docker load' ||
+docker save "${IMAGE_WEB}:${TAG}" "${IMAGE_API}:${TAG}" | gzip | ssh "${VM}" 'gunzip | docker load' ||
   die "イメージの転送に失敗した。ssh ${VM} が通るか確認する"
 
 # 3. compose と .env を置く。/opt は root 所有なので、初回だけ sudo で作って持ち主を移す。
@@ -36,7 +39,15 @@ ssh "${VM}" "[ -d ${REMOTE_DIR} ] || { sudo mkdir -p ${REMOTE_DIR} && sudo chown
 scp -q deploy/docker-compose.yml "${VM}:${REMOTE_DIR}/docker-compose.yml" || die "compose を送れなかった"
 echo "TAG=${TAG}" | ssh "${VM}" "cat > ${REMOTE_DIR}/.env" || die ".env を書けなかった"
 
-# 4. 起動する。プロジェクト名は必ず明示する（他の相乗りアプリとの衝突を避けるため）
+# 4. db を先に起動して healthy を待ち、api イメージでマイグレーションを当ててから
+#    api と feedback（web）を起動する。api が接続する前にスキーマを揃えるため
+echo "==> db を起動する"
+ssh "${VM}" "cd ${REMOTE_DIR} && docker compose -p ${PROJECT} up -d --wait db" || die "db の起動に失敗した"
+
+echo "==> マイグレーションを当てる（alembic upgrade head）"
+ssh "${VM}" "cd ${REMOTE_DIR} && docker compose -p ${PROJECT} run --rm api alembic upgrade head" ||
+  die "マイグレーションに失敗した"
+
 echo "==> 起動する"
 ssh "${VM}" "cd ${REMOTE_DIR} && docker compose -p ${PROJECT} up -d" || die "docker compose up に失敗した"
 
@@ -65,7 +76,8 @@ done
 
 # 6. 古いイメージを片付ける。今の版と1つ前だけ残す（戻せるように）
 echo "==> 古いイメージを片付ける"
-ssh "${VM}" "docker images --filter=reference='${IMAGE}' --format '{{.Repository}}:{{.Tag}}' | tail -n +3 | xargs -r docker rmi" || true
+ssh "${VM}" "docker images --filter=reference='${IMAGE_WEB}' --format '{{.Repository}}:{{.Tag}}' | tail -n +3 | xargs -r docker rmi" || true
+ssh "${VM}" "docker images --filter=reference='${IMAGE_API}' --format '{{.Repository}}:{{.Tag}}' | tail -n +3 | xargs -r docker rmi" || true
 
-echo "==> 完了: ${IMAGE}:${TAG}"
+echo "==> 完了: ${IMAGE_WEB}:${TAG} / ${IMAGE_API}:${TAG}"
 echo "    確認: ssh ${VM} \"docker exec ${CID} node -e \\\"fetch('http://127.0.0.1:3000/').then(r=>console.log(r.status))\\\"\""
