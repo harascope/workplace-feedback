@@ -7,6 +7,7 @@
 """
 
 import logging
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -22,8 +23,15 @@ from app.db.repositories import escalations as escalations_repo
 from app.db.repositories import inbox as inbox_repo
 from app.db.repositories import reports as reports_repo
 from app.db.session import get_session
-from app.domain.rules import evaluate_depts
-from app.domain.schemas import AdminView, Analysis, InboxItem
+from app.domain.rules import (
+    DELIVERY_INTERVAL_DAYS,
+    DEPT_ALERT_MIN_MEMBERS,
+    LEVEL_MAX,
+    evaluate_depts,
+    next_delivery_at,
+    severity_mix,
+)
+from app.domain.schemas import AdminView, Analysis, DeliveryStatus, InboxItem
 from app.domain.users import USERS
 
 logger = logging.getLogger(__name__)
@@ -151,10 +159,16 @@ async def cancel_report(
     author_id: str,
     session: AsyncSession = Depends(get_session),  # noqa: B008
 ) -> None:
-    ok = await reports_repo.cancel_report(session, report_id, author_id)
-    if not ok:
+    result = await reports_repo.cancel_report(session, report_id, author_id)
+    if result == "delivered":
+        # 配信済みと確定できるときだけ断定する
         raise HTTPException(
             status_code=409, detail="すでに配信されたため取り消せません。"
+        )
+    if result == "not_found":
+        raise HTTPException(
+            status_code=409,
+            detail="取り消せませんでした。すでに配信されたか、この送信が見つかりません。",
         )
 
 
@@ -200,7 +214,24 @@ async def _admin_view(session: AsyncSession) -> AdminView:
     pending = await reports_repo.pending_count(session)
     delivered = await reports_repo.list_delivered_for_eval(session)
     escalations = await escalations_repo.list_escalations(session)
-    return AdminView(pending=pending, depts=evaluate_depts(delivered), escalations=escalations)
+    oldest_pending = await reports_repo.oldest_pending_created_at(session)
+    now = datetime.now(UTC)
+    return AdminView(
+        pending=pending,
+        depts=evaluate_depts(delivered),
+        escalations=escalations,
+        severity_mix=severity_mix(delivered),
+        delivery=DeliveryStatus(
+            next_at=next_delivery_at(now),
+            interval_days=DELIVERY_INTERVAL_DAYS,
+            oldest_pending_days=(
+                None if oldest_pending is None else (now - oldest_pending).days
+            ),
+            delivered_total=len(delivered),
+        ),
+        level_max=LEVEL_MAX,
+        dept_alert_min_members=DEPT_ALERT_MIN_MEMBERS,
+    )
 
 
 @router.get("/admin", response_model=AdminView)
@@ -208,8 +239,13 @@ async def get_admin(session: AsyncSession = Depends(get_session)) -> AdminView: 
     return await _admin_view(session)
 
 
+# 未配信ぶんだけ AI（課金）を呼ぶ。E2E は1周で4回なので、それは通しつつ連打を止める値にする
 @router.post("/admin/deliver", response_model=AdminView)
-async def deliver(session: AsyncSession = Depends(get_session)) -> AdminView:  # noqa: B008
+@limiter.limit("12/minute")
+async def deliver(
+    request: Request,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+) -> AdminView:
     """まとめ配信。未配信を全部配信する。
 
     受信者向け文面（composed）はここで生成する。生成に失敗した件は composed=None の
@@ -228,6 +264,26 @@ async def deliver(session: AsyncSession = Depends(get_session)) -> AdminView:  #
     return await _admin_view(session)
 
 
+# 全消しだが E2E が各テスト冒頭で呼ぶ（8テスト × beforeEach、CI は retries:1 で最悪16回）ので高め
 @router.post("/admin/reset", status_code=204)
-async def reset(session: AsyncSession = Depends(get_session)) -> None:  # noqa: B008
+@limiter.limit("20/minute")
+async def reset(
+    request: Request,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+) -> None:
     await reports_repo.reset_to_seed(session)
+
+
+# 全消し＋24件の書き戻しと重い。E2E は呼ばず、デモで押すのも数回なので低めにする
+@router.post("/admin/seed-demo", response_model=AdminView)
+@limiter.limit("6/minute")
+async def seed_demo(
+    request: Request,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+) -> AdminView:
+    """デモ用のサンプルデータを入れる。
+
+    /admin/reset とは別経路にする（reset の件数は E2E が依存しているため変えない）。
+    """
+    await reports_repo.seed_demo(session)
+    return await _admin_view(session)

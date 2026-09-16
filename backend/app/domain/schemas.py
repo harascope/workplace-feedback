@@ -55,6 +55,29 @@ class DeptEval(BaseModel):
     level: int | None
     label: str
     detail: str
+    member_count: int = 0
+    """在籍人数。母数下限の説明に使う。申告の件数ではない。"""
+    below_min_members: bool = False
+    """母数下限に満たないか（仕様書 6.2）。満たないなら部署単位のアラートを出さない。"""
+    alert: bool = False
+    """部署アラートが出ているか（仕様書 6.2）。件数は出さない。"""
+
+
+class SeverityMix(BaseModel):
+    """配信済みの重大度の内訳（全社の合計のみ）。部署 × 重大度の表は作らない。"""
+
+    level1: int
+    level2: int
+
+
+class DeliveryStatus(BaseModel):
+    """まとめ配信の状態（仕様書 5.1）。即時配信はしないので、次がいつかを管理者に示す。"""
+
+    next_at: datetime
+    interval_days: int
+    oldest_pending_days: int | None
+    """いちばん古い未配信が待っている日数。未配信が無ければ None。"""
+    delivered_total: int
 
 
 class EscalationView(BaseModel):
@@ -69,3 +92,9 @@ class AdminView(BaseModel):
     pending: int
     depts: list[DeptEval]
     escalations: list[EscalationView]
+    severity_mix: SeverityMix
+    delivery: DeliveryStatus
+    level_max: int
+    """部署評価の段階数。5 が最も危険（仕様書 6.1）。"""
+    dept_alert_min_members: int
+    """部署アラートを出す母数の下限（仕様書 6.2）。"""

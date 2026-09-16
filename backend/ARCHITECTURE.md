@@ -29,9 +29,15 @@ class Composed(BaseModel):      what: str; why: str; how: str
 class InboxItem(BaseModel):     id: str; body: str; has_context: bool
                                 composed: Composed | None; response: Literal["ack", "dispute"] | None
 class DeptEval(BaseModel):      dept: str; level: int | None; label: str; detail: str
+                                member_count: int; below_min_members: bool; alert: bool
+class SeverityMix(BaseModel):   level1: int; level2: int        # 全社の合計のみ
+class DeliveryStatus(BaseModel): next_at: datetime; interval_days: int
+                                oldest_pending_days: int | None; delivered_total: int
 class EscalationView(BaseModel): id: str; author_name: str; raw_body: str
                                 severity_reason: str; created_at: datetime
 class AdminView(BaseModel):     pending: int; depts: list[DeptEval]; escalations: list[EscalationView]
+                                severity_mix: SeverityMix; delivery: DeliveryStatus
+                                level_max: int; dept_alert_min_members: int
 ```
 
 ## app/domain/users.py
@@ -58,11 +64,20 @@ def route_for(target: User) -> Route
 
 ```python
 @dataclass(frozen=True)
-class DeliveredReport: target_id: str; severity: int   # 集計に要る列だけ
+class DeliveredReport: target_id: str; severity: int; author_id: str = ""   # 集計に要る列だけ
+# author_id は「異なる申告者の数」を数えるためだけに使う。管理者には出さない
+
+LEVEL_MAX = 5                 # 5 が最も危険
+DEPT_ALERT_MIN_MEMBERS = 3    # 部署アラートの母数下限（仕様書 6.2。具体値は【要決定】の暫定）
+DEPT_ALERT_MIN_AUTHORS = 2    # 異なる申告者の下限（人数ベース。仕様書 3.3）
+DELIVERY_INTERVAL_DAYS = 7
 
 def evaluate_depts(delivered: Sequence[DeliveredReport]) -> list[DeptEval]
 # 配信済みだけを渡すこと。申告ゼロ → level None・label "データなし"
 # 1件だけなら detail に集中・分散を付けない
+# alert は 母数下限を満たし、異なる申告者が閾値以上、かつ対象者が複数名に分散のときだけ True
+def severity_mix(delivered: Sequence[DeliveredReport]) -> SeverityMix   # 全社の合計のみ
+def next_delivery_at(now: datetime) -> datetime                        # 次の月曜 9:00 JST を UTC で
 ```
 
 ## app/ai/（すべて async。失敗は例外。呼び出し側が 502 に変換する）
@@ -100,14 +115,19 @@ async def get_session() -> AsyncIterator[AsyncSession]   # FastAPI の依存性
 
 # repositories/reports.py
 async def add_report(s, *, author_id: str, target_id: str, severity: int, body: str, raw_body: str, has_context: bool) -> str
-async def cancel_report(s, report_id: str, author_id: str) -> bool   # 本人かつ pending のときだけ True
+CancelResult = Literal["cancelled", "delivered", "not_found"]
+async def cancel_report(s, report_id: str, author_id: str) -> CancelResult
+# 本人かつ pending のときだけ消す。失敗時は理由を返し、API 層が文言を出し分ける。
+# 配信済みと確定できるときだけ断定する。本人以外には常に not_found（存在も配信状況も伝えない）
 async def list_pending(s) -> list[Report]
 async def mark_delivered(s, report_id: str, composed: dict | None) -> None
 async def pending_count(s) -> int
 async def list_delivered_for_eval(s) -> list[DeliveredReport]
+async def oldest_pending_created_at(s) -> datetime | None
 async def set_response(s, report_id: str, kind: Literal["ack", "dispute"]) -> None
 async def purge_old(s, days: int) -> int
-async def reset_to_seed(s) -> None    # 配信済み1件・未配信1件・引き継ぎ0件
+async def reset_to_seed(s) -> None    # 配信済み1件・未配信1件・引き継ぎ0件。E2E が依存するので変えない
+async def seed_demo(s) -> None        # デモ用サンプル（申告22件・引き継ぎ2件）。入れ直す前に全件消す
 
 # repositories/inbox.py … 匿名性の要。ここ以外で受信箱を組み立てない
 async def list_inbox(s, user_id: str) -> list[InboxItem]
