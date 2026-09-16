@@ -211,8 +211,11 @@ api は web コンテナからしか到達しない（外部公開していな�
 | 名前 | 使う側 | 既定 |
 |---|---|---|
 | `DATABASE_URL` | api | — |
-| `GEMINI_API_KEY` | api | 未設定ならスタブ |
+| `GEMINI_API_KEY` | api | 未設定ならスタブ（`AI_PROVIDER=ollama` のときは無視） |
 | `GEMINI_MODEL` | api | `gemini-3.1-flash-lite` |
+| `AI_PROVIDER` | api | `gemini`（`ollama` に変えるとローカル推論。課金されない） |
+| `OLLAMA_BASE_URL` | api | `http://127.0.0.1:11434` |
+| `OLLAMA_MODEL` | api | `gemma3:12b` |
 | `RETENTION_DAYS` | api | `30` |
 | `API_BASE_URL` | web | `http://api:8000` |
 

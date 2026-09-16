@@ -12,6 +12,7 @@ dependencies = [
     "pydantic>=2.12",
     "pydantic-settings>=2.12",
     "google-genai>=2.22",
+    "httpx>=0.28",
     "slowapi>=0.1.9",
 ]
 
