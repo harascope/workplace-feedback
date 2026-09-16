@@ -8,6 +8,8 @@ secrets.env
 *.tsbuildinfo
 next-env.d.ts
 .claude/launch.json
+# サブエージェント用の git worktree 置き場
+.claude/worktrees/
 tsconfig.tsbuildinfo
 .playwright-mcp/
 test-results/
